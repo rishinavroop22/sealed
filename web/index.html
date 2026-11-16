@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sealed: understand your medical report without giving up your identity</title>
+  <meta name="description" content="Sealed hides your identity on your own device before any AI in the cloud sees your medical report.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23a8281d'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%23fff' stroke-opacity='.35' stroke-width='2'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <span class="seal-mark" aria-hidden="true"></span>
+      <span class="brand-name">Sealed</span>
+    </div>
+    <div class="chips" aria-live="polite">
+      <span class="chip" id="chip-device" title="Chrome's built-in Gemini Nano model">On-device model: checking…</span>
+      <span class="chip" id="chip-net">Network: …</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h1>Understand your medical report.<br>Keep your name out of it.</h1>
+      <p>Sealed reads your report with an AI model that runs inside this browser, removes everything that identifies you, and shows you exactly what is left. Only that sealed version is ever sent to the cloud for a full explanation.</p>
+    </section>
+
+    <ol class="rail" aria-label="Steps">
+      <li class="on" data-step="1">Add report</li>
+      <li data-step="2">Seal on this device</li>
+      <li data-step="3">Check what leaves</li>
+      <li data-step="4">Explanation</li>
+    </ol>
+
+    <section class="card" id="step-add">
+      <div class="card-head">
+        <h2>1. Add your report</h2>
+        <span class="where device">Stays on this device</span>
+      </div>
+      <textarea id="report" rows="11" spellcheck="false" placeholder="Paste the text of a lab report or prescription here…"></textarea>
+      <div class="row">
+        <button class="ghost" id="btn-sample" type="button">Use a sample report</button>
+        <span class="grow"></span>
+        <button class="primary" id="btn-seal" type="button">Seal it on this device</button>
+      </div>
+      <p class="note" id="seal-progress" hidden></p>
+    </section>
+
+    <section class="card" id="step-review" hidden>
+      <div class="card-head">
+        <h2>2. Check what leaves this device</h2>
+        <span class="where device" id="seal-source">Sealed on-device</span>
+      </div>
+      <p class="note" id="seal-note"></p>
+      <div class="split">
+        <div>
+          <h3>Sealed version <small>this is all the cloud will see</small></h3>
+          <pre class="paper" id="sealed-view" tabindex="0"></pre>
+        </div>
+        <div>
+          <h3>Hidden on this device <small id="hidden-count"></small></h3>
+          <ul class="hidden-list" id="hidden-list"></ul>
+          <form class="row add-hide" id="form-hide">
+            <input id="hide-input" type="text" placeholder="Hide another word or phrase" autocomplete="off">
+            <button class="ghost" type="submit">Hide</button>
+          </form>
+        </div>
+      </div>
+      <div class="row">
+        <button class="ghost" id="btn-back" type="button">Edit report</button>
+        <span class="grow"></span>
+        <button class="primary" id="btn-explain" type="button">Send sealed version for explanation</button>
+      </div>
+    </section>
+
+    <section class="card" id="step-explain" hidden>
+      <div class="card-head">
+        <h2>3. Your explanation</h2>
+        <span class="where" id="explain-source"></span>
+      </div>
+      <div id="explain-body"></div>
+      <p class="note">Sealed explains reports in plain language. It does not diagnose or replace your doctor.</p>
+
+      <div class="ask">
+        <h3>Ask a quick question <small>answered on this device when possible</small></h3>
+        <form class="row" id="form-ask">
+          <input id="ask-input" type="text" placeholder="For example: what does TSH measure?" autocomplete="off">
+          <button class="primary" type="submit">Ask</button>
+        </form>
+        <div id="answers"></div>
+      </div>
+    </section>
+
+    <section class="card ledger">
+      <div class="card-head">
+        <h2>Privacy ledger</h2>
+        <span class="where">Everything the AI did, and where</span>
+      </div>
+      <ul id="ledger"><li class="empty">Nothing has run yet.</li></ul>
+    </section>
+  </main>
+
+  <aside class="dev" id="dev-banner" hidden>
+    Developer mode (localhost only). App Check debug token for this browser: <code></code><br>
+    Register it in the Firebase console under App Check, Apps, Manage debug tokens to allow cloud calls from localhost.
+  </aside>
+
+  <footer>
+    <p>Built with Firebase AI Logic hybrid inference for #BuildHybridAI 2026. Open source under Apache 2.0.</p>
+  </footer>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
