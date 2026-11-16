@@ -12,8 +12,8 @@ export const firebaseConfig = {
 };
 
 // reCAPTCHA Enterprise site key used by Firebase App Check on the hosted site.
-// (A site key is public by design.) Empty until App Check is registered.
-export const RECAPTCHA_ENTERPRISE_SITE_KEY = "";
+// (A site key is public by design.) Restricted to this project's hosted domains.
+export const RECAPTCHA_ENTERPRISE_SITE_KEY = "6LcqmSMuAAAAAOXGnr8ebVHjZSN6X_8oRCRWEXN8";
 
 // Cloud model used for the deep explanation. Remote Config can override this later.
 export const CLOUD_MODEL = "gemini-3.5-flash-lite";
