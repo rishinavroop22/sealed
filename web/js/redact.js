@@ -23,7 +23,9 @@ const FIELDS = [
   { type: LABEL.DOCTOR, re: /\bDr\.? ?[A-Z][a-zA-Z.]*(?: [A-Z][a-zA-Z.]+){0,2}/g, whole: true },
   { type: LABEL.ID, re: /\b(?:UHID|MRN|MR\s*No|Patient\s*ID|Reg(?:istration)?\.?\s*No|Lab\s*(?:No|ID)|Sample\s*(?:No|ID)|Bill\s*No|Accession\s*No|Barcode|IP\s*No|OP\s*No)\.?\s*[:#\-]?\s*([A-Z0-9][A-Z0-9\/\-]{3,})/gi },
   { type: LABEL.DOB, re: /\b(?:DOB|D\.O\.B\.?|Date\s*of\s*Birth)\s*[:\-]?\s*(\d{1,2}[\/\-.\s](?:\d{1,2}|[A-Za-z]{3,9})[\/\-.\s]\d{2,4})/gi },
-  { type: LABEL.ADDRESS, re: /\b(?:Address|Addr)\s*[:\-]\s*([^\n\r]+)/gi },
+  { type: LABEL.ADDRESS, re: /\b(?:Address|Addr)[ \t]*[:\-][ \t]*([^\n\r]+)/gi },
+  // Labelled place fields such as "CITY: MYSORE" or "LOCALITY: ...", value on the same line.
+  { type: LABEL.ADDRESS, re: /\b(?:City|Town|Locality|Area|Village|Taluk|District|Dist|Landmark)[ \t]*:[ \t]*([A-Za-z][A-Za-z .'-]{1,40}?)[ \t]*(?=\s{2,}|[A-Z]{3,}[ \t]*:|$)/gim },
   // Any labelled phone number, including landlines such as "Ph: 040-2335 0000".
   { type: LABEL.CONTACT, re: /\b(?:Ph|Phone|Tel|Telephone|Mob|Mobile|Contact|Cell)\.?\s*(?:No\.?)?\s*[:\-]?\s*(\+?\d[\d\s\-]{6,16}\d)/gi },
   // Lab or hospital name: a short line naming a facility, usually the letterhead.
@@ -33,7 +35,7 @@ const FIELDS = [
 ];
 
 // Words the model sometimes flags that are clinical, not personal. Never redact these.
-const KEEP = /^(male|female|m|f|years?|yrs?|normal|high|low|positive|negative|fasting|serum|plasma|blood|urine|report|test|result|hemoglobin|haemoglobin|glucose|cholesterol|platelets?|wbc|rbc|tsh|hba1c|creatinine|vitamin\s*\w+)$/i;
+const KEEP = /^(electrolytes|biochemistry|haematology|hematology|lipid profile|lipid|profile|kidney|liver|thyroid|function|tests?|panel|routine|examination|serology|immunology|diabetes|complete|count|differential|hormones?|vitamins?|minerals|enzymes|cardiac|iron studies|urine|stool|summary|investigation|department|specimen|method|technology|units?|value|interval|name|names|patient|address|addr|ref|ref\.? by|self|doctor|dr|consultant|landmark|locality|city|state|area|age|sex|gender|sample|barcode|date|report|male|female|m|f|years?|yrs?|normal|high|low|positive|negative|fasting|serum|plasma|blood|urine|report|test|result|hemoglobin|haemoglobin|glucose|cholesterol|platelets?|wbc|rbc|tsh|hba1c|creatinine|vitamin\s*\w+)$/i;
 
 export function findPatternEntities(text) {
   const found = [];
@@ -95,7 +97,14 @@ export function cleanEntities(entities, text) {
     seen.add(key);
     out.push({ text: t, type, source: e.source || "model" });
   }
-  return dropNested(addNameParts(out.map((e) => widenFacility(e, text)), text), text);
+  return dropNested(addAddressParts(addNameParts(out.map((e) => withHouseNumber(widenFacility(e, text), text)), text), text), text);
+}
+
+// "1061 Gandhi Main Road": a house or flat number written just before an address belongs to it.
+function withHouseNumber(e, text) {
+  if (e.type !== "ADDRESS") return e;
+  const m = text.match(new RegExp(`(?:^|[\\s,:])((?:#\\s?)?\\d[\\dA-Za-z/-]{0,8}[ ,]+)${escapeRe(e.text)}`, "im"));
+  return m ? { ...e, text: m[1] + e.text } : e;
 }
 
 // "CITY DIAGNOSTICS" on the line "CITY DIAGNOSTICS & RESEARCH CENTRE": hide the whole short line.
@@ -107,6 +116,30 @@ function widenFacility(e, text) {
   const extra = full.toLowerCase().replace(e.text.toLowerCase(), "").trim();
   if (extra && words(extra) <= 4 && !/[\d:]/.test(extra) && words(full) <= 9) return { ...e, text: full };
   return e;
+}
+
+// Generic address words that are safe to leave visible on their own.
+const GENERIC_PLACE = /^(road|rd|main|cross|street|st|lane|ln|new|old|near|opp|opposite|behind|city|locality|landmark|layout|stage|phase|block|sector|flat|house|h\.?no|no|floor|area|dist|district|taluk|state|india|colony|apartment|apartments|residency|hills|nagar|extension|ext|post|po|village|town|west|east|north|south|the|and|of)$/i;
+
+// Addresses are often split over several lines. Hide each distinctive word of a hidden
+// address wherever it appears, so fragments like a street or area name cannot leak.
+function addAddressParts(entities, text) {
+  let rest = text;
+  for (const e of entities) rest = rest.split(new RegExp(escapeRe(e.text), "gi")).join(" ");
+  const have = new Set(entities.map((e) => e.text.toLowerCase()));
+  const extra = [];
+  for (const e of entities) {
+    if (e.type !== "ADDRESS" && e.type !== "FACILITY") continue;
+    for (const part of e.text.split(/[\s,.:;()\/-]+/)) {
+      if (part.length < 4 || /\d/.test(part) || GENERIC_PLACE.test(part) || KEEP.test(part) || have.has(part.toLowerCase())) continue;
+      if (e.type === "FACILITY" && /^(diagnostics?|laborator(y|ies)|labs?|hospitals?|clinic|centre|center|pathology|healthcare|medical|research|imaging|scans?|technologies|ltd|limited|pvt)$/i.test(part)) continue;
+      if (new RegExp(`\\b${escapeRe(part)}\\b`, "i").test(rest)) {
+        have.add(part.toLowerCase());
+        extra.push({ text: part, type: e.type, source: "pattern" });
+      }
+    }
+  }
+  return entities.concat(extra);
 }
 
 // Drop an item that only ever appears inside a longer hidden item (e.g. part of an address).

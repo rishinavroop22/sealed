@@ -9,3 +9,13 @@ android/build/
 android/app/build/
 android/local.properties
 android/.idea/
+
+# Real reports used for testing must never be published
+/*.pdf
+/*.jpg
+/*.jpeg
+/*.png
+/*.heic
+/private/
+/test-reports/
+/web/private-test/

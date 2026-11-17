@@ -23,6 +23,7 @@ self.addEventListener("fetch", (ev) => {
   const sameOrigin = url.origin === self.location.origin;
   const lib = LIBS.some((re) => re.test(req.url));
   if (!sameOrigin && !lib) return;
+  if (url.pathname.includes("/private-test/")) return; // never cache test reports
   if (lib) {
     // Versioned libraries never change: cache first.
     ev.respondWith(caches.match(req).then((hit) => hit || fetch(req).then((res) => {
