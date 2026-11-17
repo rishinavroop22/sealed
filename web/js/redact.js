@@ -26,6 +26,10 @@ const FIELDS = [
   { type: LABEL.ADDRESS, re: /\b(?:Address|Addr)[ \t]*[:\-][ \t]*([^\n\r]+)/gi },
   // Labelled place fields such as "CITY: MYSORE" or "LOCALITY: ...", value on the same line.
   { type: LABEL.ADDRESS, re: /\b(?:City|Town|Locality|Area|Village|Taluk|District|Dist|Landmark)[ \t]*:[ \t]*([A-Za-z][A-Za-z .'-]{1,40}?)[ \t]*(?=\s{2,}|[A-Z]{3,}[ \t]*:|$)/gim },
+  // A street line ("MIG-7, New Kantharaja Urs Road, Near ... Circle"), recognised by street words.
+  { type: LABEL.ADDRESS, re: /^[ \t]*([^\n:]{0,60}\b(?:Road|Rd|Street|Circle|Cross|Layout|Nagar|Lane|Marg|Colony|Sector|Phase|Stage|Extension|Apartments?|Residency|Society)\b[^\n]{0,80}?)[ \t,]*$/gim },
+  // City with a short postal code ("Mysore - 23").
+  { type: LABEL.ADDRESS, re: /^[ \t]*([A-Z][A-Za-z]{2,}[ \t]*-[ \t]*\d{2,6})\b/gm },
   // Any labelled phone number, including landlines such as "Ph: 040-2335 0000".
   { type: LABEL.CONTACT, re: /\b(?:Ph|Phone|Tel|Telephone|Mob|Mobile|Contact|Cell)\.?\s*(?:No\.?)?\s*[:\-]?\s*(\+?\d[\d\s\-]{6,16}\d)/gi },
   // Lab or hospital name: a short line naming a facility, usually the letterhead.
@@ -35,7 +39,7 @@ const FIELDS = [
 ];
 
 // Words the model sometimes flags that are clinical, not personal. Never redact these.
-const KEEP = /^(electrolytes|biochemistry|haematology|hematology|lipid profile|lipid|profile|kidney|liver|thyroid|function|tests?|panel|routine|examination|serology|immunology|diabetes|complete|count|differential|hormones?|vitamins?|minerals|enzymes|cardiac|iron studies|urine|stool|summary|investigation|department|specimen|method|technology|units?|value|interval|name|names|patient|address|addr|ref|ref\.? by|self|doctor|dr|consultant|landmark|locality|city|state|area|age|sex|gender|sample|barcode|date|report|male|female|m|f|years?|yrs?|normal|high|low|positive|negative|fasting|serum|plasma|blood|urine|report|test|result|hemoglobin|haemoglobin|glucose|cholesterol|platelets?|wbc|rbc|tsh|hba1c|creatinine|vitamin\s*\w+)$/i;
+const KEEP = /^(na|n\/a|nil|none|nan|op|ip|electrolytes|biochemistry|haematology|hematology|lipid profile|lipid|profile|kidney|liver|thyroid|function|tests?|panel|routine|examination|serology|immunology|diabetes|complete|count|differential|hormones?|vitamins?|minerals|enzymes|cardiac|iron studies|urine|stool|summary|investigation|department|specimen|method|technology|units?|value|interval|name|names|patient|address|addr|ref|ref\.? by|self|doctor|dr|consultant|landmark|locality|city|state|area|age|sex|gender|sample|barcode|date|report|male|female|m|f|years?|yrs?|normal|high|low|positive|negative|fasting|serum|plasma|blood|urine|report|test|result|hemoglobin|haemoglobin|glucose|cholesterol|platelets?|wbc|rbc|tsh|hba1c|creatinine|vitamin\s*\w+)$/i;
 
 export function findPatternEntities(text) {
   const found = [];
@@ -45,6 +49,7 @@ export function findPatternEntities(text) {
   for (const { type, re, whole } of FIELDS) {
     for (const m of text.matchAll(re)) {
       const value = (whole ? m[0] : m[1] || "").trim().replace(/[,;.]+$/, "");
+      if (type === LABEL.ADDRESS && /\d\s*(?:mg|g\/dl|u\/l|iu|meq|mmol|ng|pg|µ|%|cells|lakh|\/cumm|fl\b)/i.test(value)) continue;
       if (value) found.push({ text: value, type, source: "pattern" });
     }
   }
@@ -89,7 +94,8 @@ export function cleanEntities(entities, text) {
     const t = e.source === "you" ? e.text.trim() : tidy(e.text, type);
     if (t.length < 2 || t.length > 120) continue;
     if (KEEP.test(t)) continue;
-    if (/^\d+(\.\d+)?\s*%?$/.test(t) && t.length < 6) continue; // lab values, ages
+    // Short bare numbers are usually results or ages, unless pattern matching found them under an ID label ("Lab No : 8268").
+    if (/^\d+(\.\d+)?\s*%?$/.test(t) && t.length < 6 && !(e.source === "pattern" && type === "ID")) continue;
     if (e.source !== "you" && !plausible(t, type)) continue;
     if (!lower.includes(t.toLowerCase())) continue;
     const key = t.toLowerCase();

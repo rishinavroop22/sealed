@@ -5,8 +5,9 @@ import { getModels, warmDeviceModel } from "./firebase.js";
 
 const PDFJS = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/";
 
-const READ_PROMPT = `Transcribe all the text in this medical report image.
-Keep the original line breaks and keep each test name on the same line as its result, unit and reference range.
+const READ_PROMPT = `Transcribe ALL the text in this medical report image, from the very top to the bottom.
+Start with the header: the lab or hospital name, and the patient details such as name, age, sex, ID numbers, dates and the referring doctor. Then the tests.
+Keep the original line breaks. Keep each test name on the same line as its result, unit and reference range.
 Output only the transcribed text, with no comments.`;
 
 // Scale an image down and return base64 JPEG data (no data: prefix).
