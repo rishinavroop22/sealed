@@ -1,0 +1,11 @@
+{
+  "name": "Sealed",
+  "short_name": "Sealed",
+  "description": "Understand your medical report without giving up your identity.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f1e7",
+  "theme_color": "#a8281d",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}

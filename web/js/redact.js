@@ -24,6 +24,12 @@ const FIELDS = [
   { type: LABEL.ID, re: /\b(?:UHID|MRN|MR\s*No|Patient\s*ID|Reg(?:istration)?\.?\s*No|Lab\s*(?:No|ID)|Sample\s*(?:No|ID)|Bill\s*No|Accession\s*No|Barcode|IP\s*No|OP\s*No)\.?\s*[:#\-]?\s*([A-Z0-9][A-Z0-9\/\-]{3,})/gi },
   { type: LABEL.DOB, re: /\b(?:DOB|D\.O\.B\.?|Date\s*of\s*Birth)\s*[:\-]?\s*(\d{1,2}[\/\-.\s](?:\d{1,2}|[A-Za-z]{3,9})[\/\-.\s]\d{2,4})/gi },
   { type: LABEL.ADDRESS, re: /\b(?:Address|Addr)\s*[:\-]\s*([^\n\r]+)/gi },
+  // Any labelled phone number, including landlines such as "Ph: 040-2335 0000".
+  { type: LABEL.CONTACT, re: /\b(?:Ph|Phone|Tel|Telephone|Mob|Mobile|Contact|Cell)\.?\s*(?:No\.?)?\s*[:\-]?\s*(\+?\d[\d\s\-]{6,16}\d)/gi },
+  // Lab or hospital name: a short line naming a facility, usually the letterhead.
+  { type: LABEL.FACILITY, re: /^[ \t]*([A-Za-z][A-Za-z.&' -]{2,60}\b(?:Diagnostics?|Laborator(?:y|ies)|Labs?|Hospitals?|Clinic|Centre|Center|Pathology|Healthcare|Medical|Imaging|Scans?|Nursing Home)\b[A-Za-z.&' -]{0,40}?)[ \t]*(?=\s{2,}|$)/gim },
+  // A street address on its own line, recognised by an Indian 6-digit PIN code.
+  { type: LABEL.ADDRESS, re: /^[ \t]*([A-Za-z0-9][^\n\r:]{4,80}?\b[1-9]\d{2}\s?\d{3})\b/gm },
 ];
 
 // Words the model sometimes flags that are clinical, not personal. Never redact these.
@@ -190,4 +196,51 @@ export function readJson(raw) {
   const i = s.indexOf("{"), j = s.lastIndexOf("}");
   if (i >= 0 && j > i) { try { return JSON.parse(s.slice(i, j + 1)); } catch {} }
   return null;
+}
+
+// ---------- Range check ----------
+// Models sometimes mislabel a result. Where the value and reference range are plain numbers,
+// the code decides low / normal / high itself and corrects the model.
+const num = (s) => {
+  const m = String(s ?? "").replace(/,/g, "").match(/-?\d+(?:\.\d+)?/);
+  return m ? parseFloat(m[0]) : null;
+};
+
+export function rangeStatus(value, reference) {
+  const v = num(value);
+  const ref = String(reference ?? "").replace(/,/g, "");
+  if (v === null || !ref) return null;
+  // Several ranges (for example separate ranges for men and women): don't guess.
+  if ((ref.match(/\d\s*(?:-|–|—|to)\s*\d/gi) || []).length > 1 || /\b(male|female|men|women|M:|F:|adult|child)/i.test(ref)) return null;
+  let m = ref.match(/(-?\d+(?:\.\d+)?)\s*(?:-|–|—|to)\s*(-?\d+(?:\.\d+)?)/i);
+  if (m) {
+    const lo = parseFloat(m[1]), hi = parseFloat(m[2]);
+    if (!(lo < hi)) return null;
+    return v < lo ? "low" : v > hi ? "high" : "normal";
+  }
+  m = ref.match(/^\s*(<|<=|≤|up to|upto|below)\s*(-?\d+(?:\.\d+)?)/i);
+  if (m) return v > parseFloat(m[2]) ? "high" : "normal";
+  m = ref.match(/^\s*(>|>=|≥|above|over)\s*(-?\d+(?:\.\d+)?)/i);
+  if (m) return v < parseFloat(m[2]) ? "low" : "normal";
+  return null;
+}
+
+const PLAIN = { low: "below", normal: "within", high: "above" };
+
+// Correct each finding's status. If the model's label was wrong, its wording may be wrong too,
+// so replace it with a plain, correct sentence.
+export function checkFindings(data) {
+  if (!data || !Array.isArray(data.findings)) return { data, corrected: 0 };
+  let corrected = 0;
+  for (const f of data.findings) {
+    const s = rangeStatus(f.value, f.reference);
+    if (!s) continue;
+    if (String(f.status || "").toLowerCase() !== s) {
+      corrected++;
+      f.status = s;
+      f.meaning = `Your result is ${PLAIN[s]} the reference range of ${f.reference}. Ask your doctor what this means for you.`;
+      f.checked = true;
+    }
+  }
+  return { data, corrected };
 }

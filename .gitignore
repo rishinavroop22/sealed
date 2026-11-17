@@ -3,3 +3,9 @@ node_modules/
 *.log
 .DS_Store
 Thumbs.db
+android/app/google-services.json
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
