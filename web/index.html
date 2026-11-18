@@ -36,6 +36,31 @@
       <p class="ext-promo">Use ChatGPT or Gemini? The <a href="https://github.com/rishinavroop22/sealed/tree/main/extension">Sealed Chrome extension</a> seals a report on your device when you paste it into any chatbot. <a href="demo-chat.html">Try it on the test page</a>.</p>
     </section>
 
+    <section class="card welcome" id="welcome" hidden aria-labelledby="welcome-title">
+      <button class="close" id="welcome-close" type="button" aria-label="Hide this introduction">×</button>
+      <h2 id="welcome-title">New here? See it work in one click.</h2>
+      <p>Sealed loads a sample lab report, hides every personal detail on this computer, then explains it and adds it to a sample family member's health timeline. It takes about 30 seconds.</p>
+      <div class="row">
+        <button class="primary" id="btn-tour" type="button">Try with a sample report</button>
+        <span class="grow"></span>
+      </div>
+      <h3>Is this browser ready?</h3>
+      <ul class="ready" id="ready">
+        <li id="ready-device"><span class="mark">…</span><span>Checking for on-device AI (Gemini Nano)…</span></li>
+        <li id="ready-cloud"><span class="mark">…</span><span>Checking the connection…</span></li>
+        <li id="ready-ext"><span class="mark">+</span><span>Optional: the <a href="https://github.com/rishinavroop22/sealed/tree/main/extension">Chrome extension</a> seals reports you paste into ChatGPT, Gemini and other chatbots.</span></li>
+      </ul>
+      <details class="setup" id="setup" hidden>
+        <summary>How to turn on on-device AI in Chrome</summary>
+        <ol>
+          <li>Use Chrome 139 or later on a Windows, Mac, Linux or ChromeOS computer (not a phone). The computer needs about 22 GB of free disk space.</li>
+          <li>Open <code>chrome://flags/#prompt-api-for-gemini-nano-multimodal-input</code>, set it to <strong>Enabled</strong>, and relaunch Chrome.</li>
+          <li>Come back here and click <strong>Try with a sample report</strong>. The first run downloads Gemini Nano, which can take a few minutes.</li>
+        </ol>
+        <p class="note">Without on-device AI, Sealed still works: it seals with pattern rules only, says so clearly, and asks you to check the result before anything is sent.</p>
+      </details>
+    </section>
+
     <div class="settings" role="group" aria-label="Privacy settings">
       <label class="toggle">
         <input type="checkbox" id="local-only">
@@ -144,9 +169,11 @@
       <div class="row tools">
         <button class="ghost" id="btn-speak" type="button">Read aloud</button>
         <button class="ghost" id="btn-print" type="button">Print for the doctor</button>
+        <button class="ghost" id="btn-share" type="button">Share with a doctor</button>
         <button class="ghost" id="btn-retry-cloud" type="button" hidden>Try the cloud again</button>
         <span id="explain-language" hidden></span>
       </div>
+      <div class="share-box" id="share-box" hidden></div>
       <div id="explain-body"></div>
       <p class="note" id="explain-note"></p>
       <p class="note">Sealed explains reports in plain language. It does not diagnose or replace your doctor.</p>

@@ -8,7 +8,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-auth.js";
 import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, addDoc, getDocs, deleteDoc, doc,
-  query, orderBy, limit, serverTimestamp,
+  query, orderBy, limit, serverTimestamp, setDoc, Timestamp,
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-firestore.js";
 
 const auth = getAuth(app);
@@ -95,4 +95,20 @@ export function addPerson(name) {
   list.push({ id, name: String(name).trim().slice(0, 30) });
   try { localStorage.setItem(PEOPLE, JSON.stringify(list)); } catch {}
   return id;
+}
+
+// ---------- doctor share links ----------
+// A share is a read-only snapshot under /shares/{random id}: sealed results, trends and questions only.
+// No names (they never leave the browser). It expires after the chosen number of days and the owner can delete it.
+export async function createShare(payload, days = 7) {
+  const uid = await userReady;
+  if (!uid) throw new Error("Not signed in. Connect to the internet once to enable sharing.");
+  const ref = doc(collection(db, "shares"));
+  const expiresAt = Timestamp.fromMillis(Date.now() + days * 24 * 60 * 60 * 1000);
+  await setDoc(ref, { ...payload, owner: uid, createdAt: serverTimestamp(), expiresAt });
+  return { id: ref.id, expiresAt: expiresAt.toDate() };
+}
+
+export async function deleteShare(id) {
+  await deleteDoc(doc(db, "shares", id));
 }

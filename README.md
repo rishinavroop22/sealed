@@ -49,6 +49,8 @@ Many privacy tools hide names before text goes to the cloud. Sealed does that, a
 - **Read aloud** in English and eight Indian languages with the computer's own voices, for parents who find reports hard to read.
 - **A one-page sheet for the doctor**: abnormal results, changes over time and questions, printed from the device.
 - **A Chrome extension that seals before you paste.** Paste a lab report into ChatGPT, Gemini, Claude or another chatbot and Sealed offers to seal it first, on the device, with Gemini Nano through Firebase AI Logic (`ONLY_ON_DEVICE`). See [extension/](extension/).
+- **A private link for the doctor.** One click creates a read-only page with the results, ranges, trends and questions, with names replaced by neutral words. It expires after 7 days, can be stopped at any time, and the link id sits after `#` so it never reaches a server log. Firestore rules allow reading one share by its unguessable id, never listing, editing or creating one for someone else.
+- **Ready in one click for anyone trying it.** A welcome card runs a sample report end to end on a built-in sample family member with two earlier reports, and checks whether the browser has on-device AI, with exact steps to turn it on if not.
 - **Honest hybrid fallback.** If the cloud model fails, Firebase AI Logic switches to Gemini Nano automatically and the app says so, with a button to try the cloud again.
 
 ## Features
@@ -107,6 +109,7 @@ web/js/store.js         anonymous sign-in and sealed history
 web/js/app.js           UI flow and privacy ledger
 web/sw.js               offline cache
 web/demo-chat.html      test page for the Chrome extension (not a real chatbot)
+web/share.html          read-only doctor view of a share link
 extension/              Chrome extension: seal before you paste
 firestore.rules         per-user security rules
 android/                Android version (Kotlin, Jetpack Compose)

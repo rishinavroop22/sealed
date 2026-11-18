@@ -211,3 +211,37 @@ a { color: var(--wax-dark); }
 .facts-note { display: block; margin-top: 8px; color: var(--muted); font-size: 12.5px; }
 
 .ext-promo { margin: 14px 0 0; font-size: 14.5px; color: var(--muted); }
+
+/* ---------- v4: share links ---------- */
+.share-title { font-size: 26px; }
+.share-page main h2 { margin: 20px 0 10px; }
+.share-foot { max-width: 760px; }
+.table-wrap { overflow-x: auto; }
+table.results { width: 100%; border-collapse: collapse; font-size: 14.5px; background: #fff; border: 1px solid var(--line); border-radius: 10px; }
+table.results th, table.results td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+table.results th { font-size: 12.5px; color: var(--muted); font-weight: 600; }
+table.results .status { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: #efe9db; }
+table.results .status.low, table.results .status.high { background: var(--warn-bg); color: var(--warn); }
+table.results .status.normal { background: var(--device-bg); color: var(--device); }
+.all-results { margin-top: 16px; }
+.all-results summary { cursor: pointer; font-weight: 600; margin-bottom: 8px; }
+.share-box { margin-top: 14px; padding: 12px 14px; background: #fff; border: 1px solid var(--line); border-radius: 12px; }
+.share-box .link { display: flex; gap: 8px; margin: 8px 0; }
+.share-box input { flex: 1; font: 13px var(--mono); }
+.share-box small { color: var(--muted); display: block; }
+
+/* ---------- v4: first-run guidance ---------- */
+.welcome { position: relative; border-color: #e7c9a8; background: linear-gradient(180deg, #fff8ee, var(--card)); }
+.welcome h2 { font-size: 22px; margin-right: 30px; }
+.welcome p { margin: 8px 0 0; color: var(--muted); }
+.welcome h3 { margin: 18px 0 8px; }
+.welcome .close { position: absolute; top: 12px; right: 12px; background: none; border: 0; font-size: 22px; line-height: 1; color: var(--muted); padding: 4px 8px; }
+.ready { list-style: none; margin: 0; padding: 0; }
+.ready li { display: flex; gap: 10px; align-items: baseline; padding: 6px 0; font-size: 14.5px; }
+.ready .mark { flex: none; width: 22px; height: 22px; border-radius: 50%; display: inline-grid; place-items: center; font: 700 12px var(--sans); background: #efe9db; color: var(--muted); }
+.ready .mark.ok { background: var(--device-bg); color: var(--device); }
+.ready .mark.warn { background: var(--warn-bg); color: var(--warn); }
+.setup { margin-top: 10px; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
+.setup summary { cursor: pointer; font-weight: 600; }
+.setup ol { padding-left: 20px; margin: 10px 0 0; font-size: 14.5px; }
+.setup code { font: 13px var(--mono); background: #f4efe4; padding: 1px 5px; border-radius: 4px; user-select: all; }

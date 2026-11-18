@@ -258,6 +258,7 @@ async function explain() {
   btn.disabled = true;
   state.explanation = null;
   $("explain-body").innerHTML = ""; $("explain-source").textContent = ""; $("btn-save").hidden = true;
+  $("share-box").hidden = true; $("share-box").innerHTML = "";
   const useLocal = localOnly() || !navigator.onLine;
   const lang = useLocal ? "English" : language();
   $("explain-language").dataset.lang = lang;
@@ -523,10 +524,93 @@ function buildSheet() {
     <h2>Questions</h2><ol>${(d.questions || []).map((q) => `<li>${u(q)}</li>`).join("")}</ol>
     <p class="foot">Plain-language summary, not a diagnosis. Results checked against each report's own reference ranges.</p>`;
 }
+// ---------- doctor share link ----------
+// Tokens such as [NAME_1] are replaced with neutral words: the doctor already knows the patient,
+// and names never leave this device.
+function neutral(text) {
+  return String(text ?? "")
+    .replace(/\[NAME_\d+\]/g, "the patient")
+    .replace(/\[DOCTOR_\d+\]/g, "the doctor")
+    .replace(/\[(FACILITY|ADDRESS|ID|CONTACT|DOB)_\d+\]/g, "(hidden)");
+}
+
+async function shareWithDoctor() {
+  const d = state.explanation;
+  const box = $("share-box");
+  if (!d) return;
+  const btn = $("btn-share");
+  btn.disabled = true;
+  box.hidden = false;
+  box.innerHTML = `<p class="note">Creating a private link…</p>`;
+  try {
+    await storeReady;
+    if (!store) throw new Error("Sharing is not available in this browser.");
+    const findings = (d.findings || []).map((f) => ({
+      test: neutral(f.test), value: neutral(f.value), reference: neutral(f.reference || ""),
+      status: String(f.status || "unclear").toLowerCase(), meaning: neutral(f.meaning || ""),
+    }));
+    const payload = {
+      month: $("report-month").value || state.month || "",
+      language: $("explain-language").dataset.lang || "English",
+      summary: neutral(d.summary || ""),
+      urgent: neutral(d.urgent || ""),
+      findings,
+      questions: (d.questions || []).map(neutral),
+      trends: (state.series || []).slice(0, 8).map((s) => ({ label: s.label, unit: s.unit, reference: s.reference, points: s.points.map((p) => ({ month: p.month, value: p.value, status: p.status || "" })) })),
+      critical: criticalFindings(d.findings).map((c) => ({ test: neutral(c.test), value: neutral(c.value), why: c.why })),
+      where: state.explainWhere || "",
+    };
+    const { id, expiresAt } = await store.createShare(payload, 7);
+    // The id goes after '#', which browsers never send to any server, so it stays out of server logs.
+    const url = new URL(`share.html#${id}`, location.href).href;
+    state.shareId = id;
+    box.innerHTML = `
+      <strong>Private link for the doctor</strong>
+      <div class="link"><input id="share-url" type="text" readonly value="${esc(url)}" aria-label="Share link"><button class="ghost" id="btn-copy-share" type="button">Copy</button></div>
+      <small>Shows the results, ranges, changes over time and questions. No names, addresses or IDs. Expires ${expiresAt.toLocaleDateString()}.</small>
+      <button class="ghost" id="btn-stop-share" type="button">Stop sharing now</button>`;
+    log("cloud", `Created a doctor link (expires ${expiresAt.toLocaleDateString()}): results, ranges, trends and questions only. No names.`, JSON.stringify(payload, null, 2));
+  } catch (err) {
+    console.warn("[Sealed] share failed:", err);
+    box.innerHTML = `<p class="note warn">Could not create the link: ${esc(err?.message || err)}</p>`;
+  }
+  btn.disabled = false;
+}
+
 function printSheet() {
   buildSheet();
   log("local", "Prepared a one-page sheet for the doctor, on this device.");
   window.print();
+}
+
+// ---------- first-run guidance ----------
+const WELCOME = "sealed.welcome.v1";
+function showWelcome() {
+  let hidden = false;
+  try { hidden = localStorage.getItem(WELCOME) === "hidden"; } catch {}
+  $("welcome").hidden = hidden;
+  if (!hidden) updateReadiness();
+}
+function mark(li, kind, text) {
+  const m = $(li).querySelector(".mark"), t = $(li).querySelector("span:last-child");
+  m.className = "mark " + kind; m.textContent = kind === "ok" ? "✓" : "!";
+  t.innerHTML = text;
+}
+async function updateReadiness() {
+  if ($("welcome").hidden) return;
+  const status = state.device || (await deviceModelStatus());
+  if (status === "available") mark("ready-device", "ok", "On-device AI (Gemini Nano) is ready in this browser.");
+  else if (status === "downloadable" || status === "downloading") mark("ready-device", "ok", "On-device AI is supported. Gemini Nano downloads on the first run (a few minutes).");
+  else { mark("ready-device", "warn", "On-device AI is not turned on in this browser. Sealed will use pattern rules only. <a href=\"#setup\" id=\"open-setup\">How to turn it on</a>"); $("setup").hidden = false; }
+  mark("ready-cloud", navigator.onLine ? "ok" : "warn", navigator.onLine ? "Online: cloud explanations are available, for sealed text only." : "Offline: explanations will be written on this device.");
+}
+async function tour() {
+  $("btn-tour").disabled = true;
+  $("btn-sample").click();
+  $("step-add").scrollIntoView({ behavior: "smooth", block: "start" });
+  await sealReport();
+  $("btn-tour").disabled = false;
+  log("local", "Sample run: next, read what will leave, then press the red button to get the explanation.");
 }
 
 // ---------- wiring ----------
@@ -548,11 +632,35 @@ drop.addEventListener("dragleave", () => drop.classList.remove("drag"));
 drop.addEventListener("drop", (ev) => { ev.preventDefault(); drop.classList.remove("drag"); loadFile(ev.dataTransfer.files?.[0]); });
 
 $("btn-seal").addEventListener("click", sealReport);
+$("btn-tour").addEventListener("click", tour);
+$("welcome-close").addEventListener("click", () => {
+  $("welcome").hidden = true;
+  try { localStorage.setItem(WELCOME, "hidden"); } catch {}
+});
+$("welcome").addEventListener("click", (ev) => { if (ev.target.id === "open-setup") { ev.preventDefault(); $("setup").open = true; $("setup").scrollIntoView({ behavior: "smooth", block: "nearest" }); } });
+addEventListener("online", updateReadiness);
+addEventListener("offline", updateReadiness);
 $("btn-explain").addEventListener("click", explain);
 $("btn-save").addEventListener("click", saveCurrent);
 $("btn-speak").addEventListener("click", readAloud);
 $("btn-retry-cloud").addEventListener("click", () => { $("btn-retry-cloud").hidden = true; explain(); });
 $("btn-print").addEventListener("click", printSheet);
+$("btn-share").addEventListener("click", shareWithDoctor);
+$("share-box").addEventListener("click", async (ev) => {
+  if (ev.target.id === "btn-copy-share") {
+    $("share-url").select();
+    try { await navigator.clipboard.writeText($("share-url").value); ev.target.textContent = "Copied"; } catch { document.execCommand("copy"); ev.target.textContent = "Copied"; }
+  }
+  if (ev.target.id === "btn-stop-share" && state.shareId) {
+    ev.target.disabled = true;
+    try {
+      await store.deleteShare(state.shareId);
+      $("share-box").innerHTML = `<p class="note">Sharing stopped. The link no longer works.</p>`;
+      log("local", "Stopped sharing: the doctor link was deleted.");
+      state.shareId = null;
+    } catch (err) { ev.target.disabled = false; log("local", "Could not stop sharing: " + (err?.message || err)); }
+  }
+});
 $("btn-trends").addEventListener("click", explainTrends);
 $("person").addEventListener("change", () => {
   if ($("person").value === "__add") {
@@ -613,7 +721,7 @@ $("history-list").addEventListener("click", async (ev) => {
   }
 });
 
-refreshStatus();
+refreshStatus().then(showWelcome);
 storeReady.then(() => { renderPeople(); renderHistory(); });
 if ("speechSynthesis" in self) speechSynthesis.getVoices();
 configReady.then((c) => { $("chip-model").textContent = `Cloud model: ${c.cloudModel}`; });
