@@ -19,3 +19,5 @@ android/.idea/
 /private/
 /test-reports/
 /web/private-test/
+extension/node_modules/
+extension/shared/

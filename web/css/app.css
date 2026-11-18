@@ -209,3 +209,5 @@ a { color: var(--wax-dark); }
 }
 
 .facts-note { display: block; margin-top: 8px; color: var(--muted); font-size: 12.5px; }
+
+.ext-promo { margin: 14px 0 0; font-size: 14.5px; color: var(--muted); }

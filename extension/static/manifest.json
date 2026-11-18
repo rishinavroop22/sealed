@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "Sealed: seal before you paste",
+  "version": "1.0.0",
+  "description": "Hides names, IDs and contact details in a lab report on your device, with Gemini Nano, before you paste it into an AI chatbot.",
+  "minimum_chrome_version": "138",
+  "permissions": ["storage", "offscreen"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "action": { "default_popup": "popup.html", "default_title": "Sealed", "default_icon": { "16": "icon16.png", "48": "icon48.png", "128": "icon128.png" } },
+  "icons": { "16": "icon16.png", "48": "icon48.png", "128": "icon128.png" },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://gemini.google.com/*",
+        "https://claude.ai/*",
+        "https://copilot.microsoft.com/*",
+        "https://www.perplexity.ai/*",
+        "https://chat.deepseek.com/*",
+        "https://grok.com/*",
+        "https://www.meta.ai/*",
+        "https://rishinavroop22.github.io/sealed/demo-chat*",
+        "http://localhost/demo-chat*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

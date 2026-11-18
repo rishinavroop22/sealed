@@ -36,6 +36,7 @@ UHID: HYD/2291/88        Lab No: CD-774120
 Ref. By: Dr. Arvind Menon        Phone: +91 98480 12345
 Address: Flat 302, Sai Residency, Jubilee Hills, Hyderabad
 DOB: 14/03/1972
+Sample Collected on: 06/11/2026
 
 TEST                     RESULT      UNIT        REFERENCE RANGE
 Haemoglobin              9.8         g/dL        12.0 - 15.0
@@ -50,6 +51,24 @@ Serum Creatinine         0.8         mg/dL       0.6 - 1.1
 
 Remarks: Lakshmi reports tiredness for two months. Kindly correlate clinically.
 Reported by Dr. S. Fatima Khan, MD (Pathology)`;
+
+// ---------- sample family member ----------
+// A built-in sample person with two earlier reports, so anyone trying Sealed sees the timeline at once.
+// These are only numbers for the chart: no AI output is pre-written, and they never leave the browser.
+const DEMO = { id: "demo", name: "Lakshmi (sample)" };
+const demoResults = (hb, a1c, fbs, tsh, vitd, chol, crea) => [
+  { test: "Haemoglobin", value: `${hb} g/dL`, reference: "12.0 - 15.0" },
+  { test: "HbA1c", value: `${a1c} %`, reference: "< 5.7" },
+  { test: "Fasting Blood Glucose", value: `${fbs} mg/dL`, reference: "70 - 100" },
+  { test: "TSH", value: `${tsh} uIU/mL`, reference: "0.4 - 4.0" },
+  { test: "Vitamin D (25-OH)", value: `${vitd} ng/mL`, reference: "30 - 100" },
+  { test: "Total Cholesterol", value: `${chol} mg/dL`, reference: "< 200" },
+  { test: "Serum Creatinine", value: `${crea} mg/dL`, reference: "0.6 - 1.1" },
+];
+const DEMO_ITEMS = [
+  { id: "demo-1", profile: "demo", month: "2025-02", demo: true, results: demoResults(11.6, 5.5, 94, 2.8, 24, 192, 0.7) },
+  { id: "demo-2", profile: "demo", month: "2025-09", demo: true, results: demoResults(10.7, 5.9, 104, 4.4, 19, 214, 0.8) },
+];
 
 // ---------- status chips ----------
 async function refreshStatus() {
@@ -366,7 +385,7 @@ async function renderHistory() {
   }
   renderTimeline();
   const mine = historyItems.filter((h) => h.profile === person());
-  if (!mine.length) { list.innerHTML = `<li class="empty">Nothing saved for ${esc(personName())} yet. Saved reports appear here, sealed.</li>`; return; }
+  if (!mine.length) { list.innerHTML = `<li class="empty">Nothing saved for ${esc(personName())} yet.${person() === DEMO.id ? " The two earlier sample reports are built in and only feed the timeline." : " Saved reports appear here, sealed."}</li>`; return; }
   list.innerHTML = mine.map((h) => {
     const key = store.localKey(h.id);
     const title = h.explanation?.findings?.slice(0, 3).map((f) => f.test).filter(Boolean).join(", ") || "Report";
@@ -398,11 +417,14 @@ function openSaved(id) {
 }
 
 // ---------- people ----------
+function allPeople() {
+  return (store?.people() || [{ id: "me", name: "Me" }]).concat([DEMO]);
+}
 function personName(id = person()) {
-  return (store?.people() || [{ id: "me", name: "Me" }]).find((p) => p.id === id)?.name || "Me";
+  return allPeople().find((p) => p.id === id)?.name || "Me";
 }
 function renderPeople(selected) {
-  const list = store?.people() || [{ id: "me", name: "Me" }];
+  const list = allPeople();
   $("person").innerHTML = list.map((p) => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join("") + `<option value="__add">+ Add a family member…</option>`;
   $("person").value = selected && list.some((p) => p.id === selected) ? selected : list[0].id;
 }
@@ -419,10 +441,10 @@ function renderAlerts(box, crit, beforeAI) {
 // ---------- timeline ----------
 async function renderTimeline() {
   const box = $("timeline");
-  const mine = historyItems.filter((h) => h.profile === person());
+  const mine = historyItems.filter((h) => h.profile === person()).concat(person() === DEMO.id ? DEMO_ITEMS : []);
   const series = buildSeries(mine);
   const dated = mine.filter((h) => h.month).length;
-  $("timeline-who").textContent = `${personName()} · ${dated} dated report${dated === 1 ? "" : "s"}`;
+  $("timeline-who").textContent = `${personName()} · ${dated} dated report${dated === 1 ? "" : "s"}${person() === DEMO.id ? " (2 built-in samples)" : ""}`;
   if (!series.length) {
     box.innerHTML = `<p class="note">Save reports for ${esc(personName())} with their month, and values like HbA1c, creatinine or TSH will be tracked here across labs and years.</p>`;
     $("btn-trends").hidden = true;
@@ -508,7 +530,16 @@ function printSheet() {
 }
 
 // ---------- wiring ----------
-$("btn-sample").addEventListener("click", () => { $("report").value = SAMPLE; $("file-note").hidden = true; $("report").focus(); });
+$("btn-sample").addEventListener("click", () => {
+  $("report").value = SAMPLE; $("file-note").hidden = true;
+  if (person() !== DEMO.id) {
+    $("person").value = DEMO.id;
+    $("trend-summary").hidden = true;
+    renderHistory();
+    log("local", "Switched to the sample family member, who has two earlier built-in reports for the timeline.");
+  }
+  $("report").focus();
+});
 $("btn-file").addEventListener("click", () => $("file-input").click());
 $("file-input").addEventListener("change", (ev) => { loadFile(ev.target.files?.[0]); ev.target.value = ""; });
 const drop = $("step-add");

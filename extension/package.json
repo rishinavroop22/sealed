@@ -1,0 +1,11 @@
+{
+  "name": "sealed-extension",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Sealed Chrome extension: seal a lab report on the device before pasting it into an AI chatbot.",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": { "firebase": "13.3.0" },
+  "devDependencies": { "esbuild": "0.24.0" }
+}

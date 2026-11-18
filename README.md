@@ -48,6 +48,7 @@ Many privacy tools hide names before text goes to the cloud. Sealed does that, a
 - **Measured privacy.** After sealing, the app reports how many requests went to any cloud AI service, measured by the browser itself. It is always 0.
 - **Read aloud** in English and eight Indian languages with the computer's own voices, for parents who find reports hard to read.
 - **A one-page sheet for the doctor**: abnormal results, changes over time and questions, printed from the device.
+- **A Chrome extension that seals before you paste.** Paste a lab report into ChatGPT, Gemini, Claude or another chatbot and Sealed offers to seal it first, on the device, with Gemini Nano through Firebase AI Logic (`ONLY_ON_DEVICE`). See [extension/](extension/).
 - **Honest hybrid fallback.** If the cloud model fails, Firebase AI Logic switches to Gemini Nano automatically and the app says so, with a button to try the cloud again.
 
 ## Features
@@ -105,6 +106,8 @@ web/js/ingest.js        PDF and photo reading, on the device
 web/js/store.js         anonymous sign-in and sealed history
 web/js/app.js           UI flow and privacy ledger
 web/sw.js               offline cache
+web/demo-chat.html      test page for the Chrome extension (not a real chatbot)
+extension/              Chrome extension: seal before you paste
 firestore.rules         per-user security rules
 android/                Android version (Kotlin, Jetpack Compose)
 ```

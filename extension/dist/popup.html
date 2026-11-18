@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sealed</title>
+<style>
+  body { width: 360px; margin: 0; font: 14px/1.45 system-ui, "Segoe UI", sans-serif; color: #1d1b16; background: #f6f1e7; }
+  header { display: flex; align-items: center; gap: 8px; padding: 14px 16px 6px; font: 600 18px Georgia, serif; }
+  .dot { width: 18px; height: 18px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #d4544a, #a8281d 60%, #7d1c14); }
+  section { background: #fffdf8; border: 1px solid #e2d9c6; border-radius: 12px; margin: 10px 12px; padding: 12px; }
+  h2 { font: 600 14.5px Georgia, serif; margin: 0 0 6px; }
+  textarea { width: 100%; box-sizing: border-box; min-height: 90px; font: 12px/1.4 Consolas, monospace; border: 1px solid #e2d9c6; border-radius: 8px; padding: 8px; }
+  button { font: 600 13px system-ui, sans-serif; border-radius: 8px; padding: 7px 12px; cursor: pointer; border: 1px solid #e2d9c6; background: #fff; margin-top: 8px; }
+  button.p { background: #a8281d; border-color: #a8281d; color: #fff; }
+  label { display: flex; gap: 8px; align-items: center; }
+  small, #note { color: #6b6558; font-size: 12.5px; display: block; margin-top: 6px; }
+  .ok { color: #1f6f54; } .warn { color: #8a5a00; }
+  #restored { white-space: pre-wrap; margin-top: 8px; font-size: 13px; }
+</style>
+</head>
+<body>
+  <header><span class="dot"></span>Sealed</header>
+  <section>
+    <label><input type="checkbox" id="enabled"> Check pastes on AI chatbot sites</label>
+    <small id="status">Checking Gemini Nano…</small>
+  </section>
+  <section>
+    <h2>Seal any text</h2>
+    <textarea id="in" placeholder="Paste a lab report or prescription…"></textarea>
+    <button class="p" id="seal">Seal on this device</button>
+    <button id="copy" hidden>Copy</button>
+    <span id="note"></span>
+  </section>
+  <section>
+    <h2>Restore names in an AI answer</h2>
+    <textarea id="answer" placeholder="Paste the chatbot's answer (with [NAME_1] tokens)…"></textarea>
+    <button id="restore">Restore names</button>
+    <div id="restored"></div>
+    <small>The restore key stays in this browser and is cleared when Chrome closes.</small>
+  </section>
+  <section>
+    <small>Sealed runs entirely on this device with Firebase AI Logic (on-device only). <a href="https://rishinavroop22.github.io/sealed/" target="_blank">Open the full Sealed app</a> for explanations, timelines and family history.</small>
+  </section>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>
