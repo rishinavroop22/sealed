@@ -1,6 +1,6 @@
 # Sealed
 
-**Understand your medical report without giving up your identity.**
+**A private health record for your family's lab reports.** Understand every report, track the values that matter across years and labs, and never give up anyone's identity to do it.
 
 Live demo: https://rishinavroop22.github.io/sealed/
 
@@ -38,6 +38,17 @@ flowchart LR
 | Device-only mode | `ONLY_ON_DEVICE` for everything | Device | For anyone who wants nothing sent at all. |
 
 Every answer is labelled with where it ran (from `response.inferenceSource`), and the **privacy ledger** shows the exact text of anything sent to the cloud.
+
+## What makes Sealed different
+
+Many privacy tools hide names before text goes to the cloud. Sealed does that, and then does the health work only a dedicated app can:
+
+- **Health timeline per family member.** Values such as HbA1c, creatinine, uric acid or ALT are matched across different labs' naming ("SGPT", "Alanine Transaminase") and tracked over years, with each report's own reference range shaded on the chart. Family members' names never leave the browser; the cloud sees an anonymous id and the month only.
+- **Critical-value alert before any AI.** Dangerous values (for example potassium above 6.2 or platelets below 50,000) trigger "contact a doctor today" from a fixed on-device check the moment a report is added, even offline.
+- **Measured privacy.** After sealing, the app reports how many requests went to any cloud AI service, measured by the browser itself. It is always 0.
+- **Read aloud** in English and eight Indian languages with the computer's own voices, for parents who find reports hard to read.
+- **A one-page sheet for the doctor**: abnormal results, changes over time and questions, printed from the device.
+- **Honest hybrid fallback.** If the cloud model fails, Firebase AI Logic switches to Gemini Nano automatically and the app says so, with a button to try the cloud again.
 
 ## Features
 

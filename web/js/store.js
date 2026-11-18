@@ -39,13 +39,16 @@ export const localKey = (id) => readKeys()[id] || null;
 const reports = (uid) => collection(db, "users", uid, "reports");
 
 // Save a sealed report and its explanation. `map` (placeholder -> real value) stays on this device.
-export async function saveReport({ sealed, explanation, where, language, hidden }, map) {
+export async function saveReport({ sealed, explanation, where, language, hidden, profile, month, results }, map) {
   const uid = await userReady;
   if (!uid) throw new Error("Not signed in. Connect to the internet once to enable saving.");
   const ref = await addDoc(reports(uid), {
     sealed,
     explanation: JSON.stringify(explanation ?? null),
     where, language, hidden,
+    // An opaque person id ("p3k9"); the person's name stays in this browser. Month only, never a full date.
+    profile: profile || "me", month: month || "",
+    results: results || [],
     createdAt: serverTimestamp(),
   });
   const keys = readKeys(); keys[ref.id] = map; writeKeys(keys);
@@ -55,7 +58,7 @@ export async function saveReport({ sealed, explanation, where, language, hidden 
 export async function listReports() {
   const uid = await userReady;
   if (!uid) return [];
-  const snap = await getDocs(query(reports(uid), orderBy("createdAt", "desc"), limit(20)));
+  const snap = await getDocs(query(reports(uid), orderBy("createdAt", "desc"), limit(100)));
   return snap.docs.map((d) => {
     const v = d.data();
     let explanation = null;
@@ -63,6 +66,7 @@ export async function listReports() {
     return {
       id: d.id, sealed: v.sealed || "", explanation, where: v.where || "cloud",
       language: v.language || "English", hidden: v.hidden || 0,
+      profile: v.profile || "me", month: v.month || "", results: Array.isArray(v.results) ? v.results : [],
       createdAt: v.createdAt?.toDate?.() || new Date(),
     };
   });
@@ -73,4 +77,22 @@ export async function removeReport(id) {
   if (!uid) return;
   await deleteDoc(doc(db, "users", uid, "reports", id));
   const keys = readKeys(); delete keys[id]; writeKeys(keys);
+}
+
+// ---------- people (family profiles) ----------
+// Names are kept only in this browser. Firestore sees an opaque id.
+const PEOPLE = "sealed.people.v1";
+export function people() {
+  try {
+    const list = JSON.parse(localStorage.getItem(PEOPLE) || "null");
+    if (Array.isArray(list) && list.length) return list;
+  } catch {}
+  return [{ id: "me", name: "Me" }];
+}
+export function addPerson(name) {
+  const list = people();
+  const id = "p" + Math.random().toString(36).slice(2, 6);
+  list.push({ id, name: String(name).trim().slice(0, 30) });
+  try { localStorage.setItem(PEOPLE, JSON.stringify(list)); } catch {}
+  return id;
 }

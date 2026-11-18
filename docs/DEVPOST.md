@@ -4,13 +4,15 @@
 Sealed
 
 ## Tagline
-Understand your medical report without giving up your identity.
+A private health record for your family's lab reports: understand them, track them over years, and never give up anyone's identity.
 
 ## Inspiration
 In India, lab reports arrive on WhatsApp as PDFs and photos, and people increasingly paste them into AI chatbots to understand them. Each report carries a full name, date of birth, phone number, address, hospital ID and the doctor's name, all sent to a server along with the health data. We wanted the explanation without the exposure.
 
 ## What it does
 Sealed reads a lab report or prescription (pasted text, a PDF or a photo) with Gemini Nano running inside Chrome. It removes every identifier, shows the user exactly what is left, and only then sends that sealed text to a cloud Gemini model for a plain-language explanation in English or one of eight Indian languages. Names are put back on the device for display, so the explanation reads naturally while the cloud only ever saw tokens like [NAME_1].
+
+Reports are saved to a health timeline per family member, so values like HbA1c, creatinine and liver enzymes can be followed across years and different labs, with each lab's reference range shaded on the chart. A fixed on-device check flags dangerous values ("contact a doctor today") the moment a report is added, before any AI runs and even offline. Explanations can be read aloud in Indian languages, and a one-page sheet can be printed for the next doctor's visit.
 
 With no network, or in device-only mode, the on-device model writes the explanation and nothing is sent at all. A privacy ledger shows every AI call, where it ran, and the exact text of anything that left the device.
 

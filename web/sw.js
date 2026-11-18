@@ -1,9 +1,9 @@
 // Offline support: cache the app and the libraries it loads so Sealed opens with no network.
 // Only GET requests for code and assets are cached. Model calls, Firestore and sign-in are never cached.
-const VERSION = "sealed-v4";
+const VERSION = "sealed-v5";
 const SHELL = [
   "./", "index.html", "css/app.css", "icon.svg", "manifest.webmanifest",
-  "js/app.js", "js/firebase.js", "js/firebase-config.js", "js/redact.js", "js/ingest.js", "js/store.js",
+  "js/app.js", "js/firebase.js", "js/firebase-config.js", "js/redact.js", "js/ingest.js", "js/store.js", "js/health.js",
 ];
 const LIBS = [/^https:\/\/www\.gstatic\.com\/firebasejs\//, /^https:\/\/cdn\.jsdelivr\.net\/npm\/pdfjs-dist@/];
 

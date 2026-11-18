@@ -5,14 +5,19 @@ import {
 } from "./firebase.js";
 import { findPatternEntities, mergeEntities, seal, unseal, chunk, readJson, checkFindings } from "./redact.js";
 import { readFile } from "./ingest.js";
+import {
+  criticalFindings, quickParse, detectMonth, monthLabel, buildSeries, trendSentence, sparkline,
+  speak, stopSpeaking, voiceFor, watchCloudAI, mergeResults, trendFacts, notableFirst,
+} from "./health.js";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 const state = {
   raw: "", entities: [], sealed: "", map: {}, device: "unavailable", usedModel: false,
-  explanation: null, explainWhere: "", savedId: null,
+  explanation: null, explainWhere: "", savedId: null, month: "",
 };
+const person = () => $("person").value || "me";
 const localOnly = () => $("local-only").checked;
 const language = () => $("language").value;
 
@@ -141,6 +146,7 @@ async function sealReport() {
   state.raw = raw; state.savedId = null;
   progress(true, "Finding identifiers with pattern matching…");
 
+  const watch = watchCloudAI();
   let entities = findPatternEntities(raw);
   log("local", `Pattern matching found ${entities.length} identifiers. No AI, no network.`);
 
@@ -170,7 +176,12 @@ async function sealReport() {
     await refreshStatus();
   }
 
+  const aiRequests = await watch.stop();
+  log("local", `Proof: ${aiRequests} request${aiRequests === 1 ? "" : "s"} to any cloud AI service while sealing (measured by the browser).`);
   state.entities = entities;
+  state.month = detectMonth(raw);
+  $("report-month").value = state.month;
+  renderAlerts($("review-alert"), criticalFindings(quickParse(raw)), true);
   renderReview();
   btn.disabled = false;
   progress(false);
@@ -217,7 +228,7 @@ Write every text value in ${lang}. Keep test names, numbers and units as in the 
 Return only JSON with this shape:
 {"summary":"2-3 sentence overview",
  "urgent":"one sentence if any value needs prompt medical attention, otherwise empty string",
- "findings":[{"test":"name","value":"value with unit","reference":"reference range","status":"low|normal|high|unclear","meaning":"1-2 plain sentences"}],
+ "findings" (include EVERY test in the report, normal ones too):[{"test":"name","value":"value with unit","reference":"reference range","status":"low|normal|high|unclear","meaning":"1-2 plain sentences"}],
  "questions":["3 to 5 questions the patient could ask their doctor"]}
 
 REPORT:
@@ -226,8 +237,11 @@ ${sealed}`;
 async function explain() {
   const btn = $("btn-explain");
   btn.disabled = true;
+  state.explanation = null;
+  $("explain-body").innerHTML = ""; $("explain-source").textContent = ""; $("btn-save").hidden = true;
   const useLocal = localOnly() || !navigator.onLine;
   const lang = useLocal ? "English" : language();
+  $("explain-language").dataset.lang = lang;
   progress(true, useLocal ? "Writing the explanation on this device…" : "Sending the sealed version to the cloud model…");
   const prompt = EXPLAIN_PROMPT(state.sealed, lang, useLocal);
   try {
@@ -244,9 +258,15 @@ async function explain() {
       ? `Sealed report sent to the cloud model ${m.config.cloudModel} (${state.sealed.length} characters, ${Object.keys(state.map).length} identifiers hidden).`
       : "The on-device model wrote the explanation. Nothing was sent.", where === "cloud" ? state.sealed : null);
     renderExplanation(state.explanation, where, state.map);
+    renderAlerts($("explain-alert"), criticalFindings(state.explanation.findings), false);
+    $("btn-retry-cloud").hidden = true;
     if (useLocal && language() !== "English") $("explain-note").textContent = "On-device explanations are written in English. Turn off device-only mode for other languages.";
-    else $("explain-note").textContent = "";
-    $("btn-save").hidden = false; $("btn-save").disabled = false; $("btn-save").textContent = "Save sealed copy to history";
+    else if (!useLocal && where === "device") {
+      $("explain-note").textContent = "The cloud model was busy or failed, so Firebase AI Logic switched to the on-device model automatically. Nothing extra was sent.";
+      $("btn-retry-cloud").hidden = false;
+      log("device", "Cloud model unavailable: Firebase AI Logic fell back to the on-device model (PREFER_IN_CLOUD).");
+    } else $("explain-note").textContent = "";
+    $("btn-save").hidden = false; $("btn-save").disabled = false; $("btn-save").textContent = `Save to ${personName()}'s timeline`;
   } catch (err) {
     console.error("[Sealed] explanation failed:", err);
     $("explain-body").innerHTML = `<p class="note warn">The explanation could not be generated. ${useLocal ? "This browser's on-device model could not run. " : appCheckReady ? "" : "Cloud access is not configured for this site yet. "}${esc(err?.message || err)}</p>`;
@@ -319,13 +339,15 @@ async function saveCurrent() {
     state.savedId = await store.saveReport({
       sealed: state.sealed, explanation: state.explanation, where: state.explainWhere,
       language: localOnly() ? "English" : language(), hidden: Object.keys(state.map).length,
+      profile: person(), month: $("report-month").value || state.month,
+      results: mergeResults(state.explanation?.findings, quickParse(state.raw)),
     }, state.map);
     btn.textContent = "Saved";
-    log("cloud", "Saved the sealed copy to your private history (Firestore). The key that restores names stayed on this device.", state.sealed);
+    log("cloud", `Saved the sealed copy to ${personName()}'s timeline (Firestore): sealed text, results and the month only. Names and the key that restores them stayed on this device.`, state.sealed);
     renderHistory();
   } catch (err) {
     console.warn("[Sealed] save failed:", err);
-    btn.disabled = false; btn.textContent = "Save sealed copy to history";
+    btn.disabled = false; btn.textContent = `Save to ${personName()}'s timeline`;
     log("local", `Could not save: ${err?.message || err}`);
   }
 }
@@ -342,14 +364,16 @@ async function renderHistory() {
     list.innerHTML = `<li class="empty">History could not be loaded${navigator.onLine ? "" : " while offline"}.</li>`;
     return;
   }
-  if (!historyItems.length) { list.innerHTML = `<li class="empty">Nothing saved yet. Saved reports appear here, sealed.</li>`; return; }
-  list.innerHTML = historyItems.map((h) => {
+  renderTimeline();
+  const mine = historyItems.filter((h) => h.profile === person());
+  if (!mine.length) { list.innerHTML = `<li class="empty">Nothing saved for ${esc(personName())} yet. Saved reports appear here, sealed.</li>`; return; }
+  list.innerHTML = mine.map((h) => {
     const key = store.localKey(h.id);
     const title = h.explanation?.findings?.slice(0, 3).map((f) => f.test).filter(Boolean).join(", ") || "Report";
     return `<li>
       <button type="button" class="hist-open" data-open="${esc(h.id)}">
         <span class="hist-title">${esc(title)}</span>
-        <span class="hist-meta">${h.createdAt.toLocaleDateString()} · ${h.hidden} hidden · ${esc(h.language)}${key ? "" : " · names not on this device"}</span>
+        <span class="hist-meta">${esc(monthLabel(h.month))} · ${h.hidden} hidden · ${esc(h.language)}${key ? "" : " · names not on this device"}</span>
       </button>
       <button type="button" class="hist-del" data-del="${esc(h.id)}" aria-label="Delete this saved report">Delete</button>
     </li>`;
@@ -361,13 +385,126 @@ function openSaved(id) {
   if (!h) return;
   const map = store?.localKey(id) || {};
   state.sealed = h.sealed; state.map = map; state.explanation = h.explanation; state.explainWhere = h.where;
+  state.month = h.month; $("report-month").value = h.month || "";
+  $("explain-language").dataset.lang = h.language || "English";
   state.entities = Object.values(map).map((t) => ({ text: t, type: "NAME", source: "you" }));
   renderExplanation(h.explanation || { summary: "", findings: [] }, h.where, map);
+  renderAlerts($("explain-alert"), criticalFindings(h.explanation?.findings), false);
   $("explain-note").textContent = Object.keys(map).length ? "Opened from your history." : "Opened from your history. The names are not stored on this device, so tokens are shown instead.";
   $("btn-save").hidden = true;
   $("answers").innerHTML = "";
   log("local", "Opened a saved report from history.");
   show("step-explain"); setStep(4);
+}
+
+// ---------- people ----------
+function personName(id = person()) {
+  return (store?.people() || [{ id: "me", name: "Me" }]).find((p) => p.id === id)?.name || "Me";
+}
+function renderPeople(selected) {
+  const list = store?.people() || [{ id: "me", name: "Me" }];
+  $("person").innerHTML = list.map((p) => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join("") + `<option value="__add">+ Add a family member…</option>`;
+  $("person").value = selected && list.some((p) => p.id === selected) ? selected : list[0].id;
+}
+
+// ---------- critical alerts ----------
+function renderAlerts(box, crit, beforeAI) {
+  if (!crit.length) { box.hidden = true; box.innerHTML = ""; return; }
+  box.hidden = false;
+  box.innerHTML = `<strong>Contact a doctor today.</strong> ${crit.map((c) => `${esc(c.test)} is ${esc(c.why)} (${esc(c.value)})`).join("; ")}.
+    <small>${beforeAI ? "Found by a fixed check on this device before any AI ran, so it works offline." : "Flagged by a fixed check on this device."} Thresholds are general adult values and are not a diagnosis.</small>`;
+  log("local", `Critical-value check flagged ${crit.length} result${crit.length === 1 ? "" : "s"}. No AI involved.`);
+}
+
+// ---------- timeline ----------
+async function renderTimeline() {
+  const box = $("timeline");
+  const mine = historyItems.filter((h) => h.profile === person());
+  const series = buildSeries(mine);
+  const dated = mine.filter((h) => h.month).length;
+  $("timeline-who").textContent = `${personName()} · ${dated} dated report${dated === 1 ? "" : "s"}`;
+  if (!series.length) {
+    box.innerHTML = `<p class="note">Save reports for ${esc(personName())} with their month, and values like HbA1c, creatinine or TSH will be tracked here across labs and years.</p>`;
+    $("btn-trends").hidden = true;
+    return;
+  }
+  const multi = notableFirst(series.filter((s) => s.points.length > 1));
+  const show = (multi.length ? multi : series).slice(0, 12);
+  box.innerHTML = `<div class="trend-grid">${show.map((s) => `
+    <figure class="trend">
+      <figcaption><strong>${esc(s.label)}</strong><span>${esc(s.reference ? "ref " + s.reference : "")}</span></figcaption>
+      ${sparkline(s)}
+      <p>${esc(trendSentence(s))}</p>
+    </figure>`).join("")}</div>
+    ${multi.length ? "" : `<p class="note">Only one dated report so far. Add another for ${esc(personName())} to see changes over time.</p>`}`;
+  $("btn-trends").hidden = !multi.length;
+  state.series = multi;
+}
+
+async function explainTrends() {
+  const btn = $("btn-trends");
+  const series = state.series || [];
+  if (!series.length) return;
+  btn.disabled = true;
+  const facts = trendFacts(series.slice(0, 10));
+  const prompt = `Rewrite these FACTS about one person's lab results over time as 3 to 5 plain, calm sentences for a patient.
+Use only what the FACTS say: do not change any number, direction or "in range" / "above range" / "below range" label, and do not compare anything yourself.
+Mention first the results that are now outside their range. Do not name any disease or cause. End by suggesting they show these changes to their doctor.
+
+FACTS:
+${facts}`;
+  const out = $("trend-summary");
+  out.hidden = false; out.textContent = "Writing a summary…";
+  try {
+    const m = await getModels();
+    const local = localOnly() || !navigator.onLine;
+    const result = await (local ? m.quickLocal : m.summary).generateContent(prompt);
+    const where = sourceOf(result);
+    out.innerHTML = `<span class="where ${where}">${where === "device" ? "On this device" : "Cloud"}</span> ${esc(result.response.text().trim())}
+      <small class="facts-note">Directions and ranges were worked out by Sealed's code; the AI only put them into words.</small>`;
+    log(where, where === "device" ? "Trend summary written on this device from code-computed facts. Nothing was sent." : "Trend summary: only test names, numbers and months were sent to the cloud.", where === "cloud" ? facts : null);
+  } catch (err) {
+    out.textContent = "Could not write the summary: " + (err?.message || err);
+  }
+  btn.disabled = false;
+}
+
+// ---------- read aloud and doctor sheet ----------
+function spokenText() {
+  const d = state.explanation; if (!d) return "";
+  const u = (t) => unseal(t || "", state.map);
+  return [u(d.summary), u(d.urgent), ...(d.findings || []).filter((f) => f.status !== "normal").map((f) => `${u(f.test)}: ${u(f.meaning)}`), ...(d.questions || []).map(u)].filter(Boolean).join(". ");
+}
+function readAloud() {
+  const btn = $("btn-speak");
+  if (btn.dataset.on) { stopSpeaking(); btn.dataset.on = ""; btn.textContent = "Read aloud"; return; }
+  const lang = $("explain-language").dataset.lang || "English";
+  const ok = speak(spokenText(), lang, () => { btn.dataset.on = ""; btn.textContent = "Read aloud"; });
+  if (!ok) { $("explain-note").textContent = `This computer has no ${lang} voice installed. Add one in Windows Settings, Time & language, Speech.`; return; }
+  btn.dataset.on = "1"; btn.textContent = "Stop reading";
+  log("local", `Reading the explanation aloud in ${lang} with this computer's own voice. Nothing was sent.`);
+}
+
+function buildSheet() {
+  const d = state.explanation || {};
+  const u = (t) => esc(unseal(t || "", state.map));
+  const abnormal = (d.findings || []).filter((f) => ["low", "high"].includes(String(f.status).toLowerCase()));
+  const crit = criticalFindings(d.findings);
+  const trends = (state.series || []).slice(0, 6);
+  $("print-sheet").innerHTML = `
+    <h1>Lab results to discuss</h1>
+    <p class="meta">${esc(personName())} · ${esc(monthLabel($("report-month").value || state.month))} · prepared with Sealed</p>
+    ${crit.length ? `<p class="crit">Needs prompt attention: ${crit.map((c) => `${esc(c.test)} ${esc(c.value)}`).join(", ")}</p>` : ""}
+    <h2>Outside the reference range</h2>
+    ${abnormal.length ? `<table><tr><th>Test</th><th>Result</th><th>Reference</th><th></th></tr>${abnormal.map((f) => `<tr><td>${u(f.test)}</td><td>${u(f.value)}</td><td>${u(f.reference)}</td><td>${esc(f.status)}</td></tr>`).join("")}</table>` : "<p>None.</p>"}
+    ${trends.length ? `<h2>Changes over time</h2><ul>${trends.map((s) => `<li>${esc(trendSentence(s))}</li>`).join("")}</ul>` : ""}
+    <h2>Questions</h2><ol>${(d.questions || []).map((q) => `<li>${u(q)}</li>`).join("")}</ol>
+    <p class="foot">Plain-language summary, not a diagnosis. Results checked against each report's own reference ranges.</p>`;
+}
+function printSheet() {
+  buildSheet();
+  log("local", "Prepared a one-page sheet for the doctor, on this device.");
+  window.print();
 }
 
 // ---------- wiring ----------
@@ -382,6 +519,28 @@ drop.addEventListener("drop", (ev) => { ev.preventDefault(); drop.classList.remo
 $("btn-seal").addEventListener("click", sealReport);
 $("btn-explain").addEventListener("click", explain);
 $("btn-save").addEventListener("click", saveCurrent);
+$("btn-speak").addEventListener("click", readAloud);
+$("btn-retry-cloud").addEventListener("click", () => { $("btn-retry-cloud").hidden = true; explain(); });
+$("btn-print").addEventListener("click", printSheet);
+$("btn-trends").addEventListener("click", explainTrends);
+$("person").addEventListener("change", () => {
+  if ($("person").value === "__add") {
+    $("add-person").hidden = false; $("new-person").focus();
+    renderPeople(); return;
+  }
+  $("trend-summary").hidden = true;
+  renderHistory();
+});
+$("form-person").addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  const name = $("new-person").value.trim();
+  if (!name || !store) return;
+  const id = store.addPerson(name);
+  $("new-person").value = ""; $("add-person").hidden = true;
+  renderPeople(id);
+  log("local", `Added ${name}. The name is stored only in this browser.`);
+  renderHistory();
+});
 $("btn-back").addEventListener("click", () => { show("step-add"); $("step-review").hidden = true; setStep(1); });
 $("btn-new").addEventListener("click", () => {
   $("report").value = ""; $("file-note").hidden = true;
@@ -424,7 +583,8 @@ $("history-list").addEventListener("click", async (ev) => {
 });
 
 refreshStatus();
-renderHistory();
+storeReady.then(() => { renderPeople(); renderHistory(); });
+if ("speechSynthesis" in self) speechSynthesis.getVoices();
 configReady.then((c) => { $("chip-model").textContent = `Cloud model: ${c.cloudModel}`; });
 if (debugToken) {
   const dev = $("dev-banner");

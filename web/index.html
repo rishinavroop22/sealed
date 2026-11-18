@@ -42,6 +42,10 @@
         <span><strong>Device-only mode</strong><br><small>Nothing at all is sent to the cloud</small></span>
       </label>
       <label class="lang">
+        <span>Report for</span>
+        <select id="person" aria-describedby="person-note"><option value="me">Me</option></select>
+      </label>
+      <label class="lang">
         <span>Explain in</span>
         <select id="language">
           <option>English</option>
@@ -56,6 +60,12 @@
         </select>
       </label>
     </div>
+    <div id="add-person" hidden><form class="add-person" id="form-person">
+      <label for="new-person">Family member's name or nickname</label>
+      <input id="new-person" type="text" maxlength="30" placeholder="For example: Amma" autocomplete="off">
+      <button class="ghost" type="submit">Add</button>
+      <small id="person-note">Kept only in this browser. The cloud sees an anonymous id.</small>
+    </form></div>
 
     <ol class="rail" aria-label="Steps">
       <li class="on" data-step="1">Add report</li>
@@ -95,6 +105,7 @@
         <h2>2. Check what leaves this device</h2>
         <span class="where device" id="seal-source">Sealed on-device</span>
       </div>
+      <div class="alert" id="review-alert" role="alert" hidden></div>
       <p class="note" id="seal-note"></p>
       <div class="split">
         <div>
@@ -111,6 +122,11 @@
           </form>
         </div>
       </div>
+      <div class="row month-row">
+        <label for="report-month">Report month</label>
+        <input id="report-month" type="month">
+        <small>Only the month is saved, for the timeline. Detected on this device.</small>
+      </div>
       <div class="row">
         <button class="ghost" id="btn-back" type="button">Edit report</button>
         <span class="grow"></span>
@@ -122,6 +138,13 @@
       <div class="card-head">
         <h2>3. Your explanation</h2>
         <span class="where" id="explain-source"></span>
+      </div>
+      <div class="alert" id="explain-alert" role="alert" hidden></div>
+      <div class="row tools">
+        <button class="ghost" id="btn-speak" type="button">Read aloud</button>
+        <button class="ghost" id="btn-print" type="button">Print for the doctor</button>
+        <button class="ghost" id="btn-retry-cloud" type="button" hidden>Try the cloud again</button>
+        <span id="explain-language" hidden></span>
       </div>
       <div id="explain-body"></div>
       <p class="note" id="explain-note"></p>
@@ -141,6 +164,19 @@
         </form>
         <div id="answers" aria-live="polite"></div>
       </div>
+    </section>
+
+    <section class="card timeline-card" id="timeline-card">
+      <div class="card-head">
+        <h2>Health timeline</h2>
+        <span class="where" id="timeline-who"></span>
+      </div>
+      <div id="timeline"><p class="note">Loading…</p></div>
+      <div class="row">
+        <span class="grow"></span>
+        <button class="ghost" id="btn-trends" type="button" hidden>Explain these changes</button>
+      </div>
+      <p class="trend-summary" id="trend-summary" hidden></p>
     </section>
 
     <div class="two">
@@ -172,6 +208,7 @@
     <p>Built with Firebase AI Logic hybrid inference, App Check, Authentication, Firestore and Remote Config for #BuildHybridAI 2026. <a href="https://github.com/rishinavroop22/sealed">Open source</a> under Apache 2.0.</p>
   </footer>
 
+  <div id="print-sheet" class="print-only" aria-hidden="true"></div>
   <script type="module" src="js/app.js"></script>
 </body>
 </html>

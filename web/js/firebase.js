@@ -171,6 +171,14 @@ export async function getModels() {
       inCloudParams: { ...cloud, generationConfig: { responseMimeType: "application/json" } },
       onDeviceParams: { createOptions: textIO, promptOptions: { responseConstraint: EXPLAIN_SCHEMA } },
     }),
+    // 5. Rephrasing code-computed trend facts. PREFER_IN_CLOUD: the facts hold only test names,
+    //    numbers and months, and the larger model rephrases more reliably; offline it runs on the device.
+    summary: getGenerativeModel(ai, {
+      mode: InferenceMode.PREFER_IN_CLOUD,
+      inCloudParams: cloud,
+      onDeviceParams: { createOptions: textIO },
+    }),
+
     // Device-only mode and offline: the explanation never leaves the device either.
     deepLocal: getGenerativeModel(ai, {
       mode: InferenceMode.ONLY_ON_DEVICE,

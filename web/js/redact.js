@@ -257,7 +257,7 @@ export function rangeStatus(value, reference) {
     if (!(lo < hi)) return null;
     return v < lo ? "low" : v > hi ? "high" : "normal";
   }
-  m = ref.match(/^\s*(<|<=|≤|up to|upto|below)\s*(-?\d+(?:\.\d+)?)/i);
+  m = ref.match(/^\s*(<|<=|≤|up to|upto|below|less than)\s*(-?\d+(?:\.\d+)?)/i);
   if (m) return v > parseFloat(m[2]) ? "high" : "normal";
   m = ref.match(/^\s*(>|>=|≥|above|over)\s*(-?\d+(?:\.\d+)?)/i);
   if (m) return v < parseFloat(m[2]) ? "low" : "normal";

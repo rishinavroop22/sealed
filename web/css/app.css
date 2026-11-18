@@ -171,3 +171,41 @@ a { color: var(--wax-dark); }
 }
 
 .finding .checked { font-size: 12px; color: var(--muted); margin-top: 6px; }
+
+/* ---------- v3: health features ---------- */
+.alert { background: #fbe4e1; color: #7d1c14; border: 1px solid #f0bdb6; border-radius: 12px; padding: 12px 14px; margin: 0 0 14px; font-size: 15px; }
+.alert strong { display: block; font-size: 16px; margin-bottom: 2px; }
+.alert small { display: block; margin-top: 6px; color: #8d4a43; font-size: 12.5px; }
+.month-row label { font-weight: 600; font-size: 14.5px; }
+.month-row input { font: 15px var(--sans); padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); }
+.month-row small { color: var(--muted); font-size: 12.5px; }
+.tools { margin: 0 0 14px; }
+.tools button { padding: 8px 14px; font-size: 14px; }
+.add-person { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; background: var(--card); border: 1px dashed var(--line); border-radius: 12px; padding: 12px 16px; margin: -6px 0 18px; font-size: 14.5px; }
+.add-person input { flex: 1; min-width: 160px; width: auto; }
+.add-person small { width: 100%; color: var(--muted); }
+.trend-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
+.trend { margin: 0; border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: #fff; }
+.trend figcaption { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; }
+.trend figcaption span { color: var(--muted); font-size: 12px; }
+.trend p { margin: 4px 0 0; font-size: 13.5px; color: var(--muted); }
+.trend svg .band { fill: var(--device-bg); }
+.trend svg .ln { fill: none; stroke: var(--ink); stroke-width: 2; }
+.trend svg circle.ok { fill: var(--device); }
+.trend svg circle.out { fill: var(--wax); }
+.trend svg .v { font: 11px var(--mono); fill: var(--ink); }
+.trend-summary { margin: 12px 0 0; padding: 12px; background: #fff; border: 1px solid var(--line); border-radius: 10px; font-size: 15px; }
+.print-only { display: none; }
+@media print {
+  body > *:not(#print-sheet) { display: none !important; }
+  #print-sheet { display: block !important; font: 12pt/1.5 Georgia, serif; color: #000; padding: 0; }
+  #print-sheet h1 { font-size: 20pt; margin: 0 0 4px; }
+  #print-sheet h2 { font-size: 13pt; margin: 18px 0 6px; border-bottom: 1px solid #999; }
+  #print-sheet .meta { color: #444; margin: 0; }
+  #print-sheet .crit { border: 2px solid #000; padding: 8px; font-weight: bold; }
+  #print-sheet table { width: 100%; border-collapse: collapse; }
+  #print-sheet td, #print-sheet th { border-bottom: 1px solid #ccc; padding: 4px 6px; text-align: left; }
+  #print-sheet .foot { margin-top: 24px; font-size: 9.5pt; color: #444; }
+}
+
+.facts-note { display: block; margin-top: 8px; color: var(--muted); font-size: 12.5px; }
