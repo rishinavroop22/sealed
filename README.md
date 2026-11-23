@@ -8,6 +8,15 @@ Sealed is a web app for patients and families. It reads a lab report or prescrip
 
 Built for [#BuildHybridAI 2026](https://firebasehybridaihackathon.devpost.com/) with **Firebase AI Logic hybrid inference**.
 
+## For judges: try it in 2 minutes
+
+1. Open the [live demo](https://rishinavroop22.github.io/sealed/) in desktop Chrome. If the "On-device AI" chip is not ready, enable `chrome://flags/#prompt-api-for-gemini-nano-multimodal-input`, restart Chrome and let the model download once.
+2. Click **Try with a sample report**. Watch the sealed text appear: the name, doctor, lab address and IDs are replaced by on-device AI plus pattern rules, and the proof line shows 0 cloud requests during sealing.
+3. Click **Send sealed version for explanation**. Only the sealed text goes to Gemini in the cloud (shown word for word in the Privacy ledger). Switch the language to Hindi or Tamil and explain again.
+4. Click **Save sealed copy to history**, then **Explain these changes** on the timeline: a sample family member already has two earlier reports.
+5. Try **Share with a doctor** (a read-only link that expires in 7 days) and **Print for the doctor**.
+6. Turn on **Device-only mode**, or switch Wi-Fi off after the first load: sealing, explanation and questions still work on Gemini Nano.
+
 ## The problem
 
 People increasingly paste lab reports into AI chatbots to understand them. Those reports carry a full name, date of birth, phone number, address, hospital ID and doctor's name, all sent to a server along with the person's health data. Most people either accept that or go without an explanation.

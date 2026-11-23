@@ -11,6 +11,13 @@ import {
 } from "./health.js";
 
 const $ = (id) => document.getElementById(id);
+// Wires an event to an element if it exists. A missing element (for example an older cached page)
+// then disables only that one control instead of stopping the whole app.
+function on(id, type, fn) {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener(type, fn);
+  else console.warn(`[Sealed] #${id} not found; reload the page to get the latest version.`);
+}
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 const state = {
@@ -614,7 +621,7 @@ async function tour() {
 }
 
 // ---------- wiring ----------
-$("btn-sample").addEventListener("click", () => {
+on("btn-sample", "click", () => {
   $("report").value = SAMPLE; $("file-note").hidden = true;
   if (person() !== DEMO.id) {
     $("person").value = DEMO.id;
@@ -624,29 +631,29 @@ $("btn-sample").addEventListener("click", () => {
   }
   $("report").focus();
 });
-$("btn-file").addEventListener("click", () => $("file-input").click());
-$("file-input").addEventListener("change", (ev) => { loadFile(ev.target.files?.[0]); ev.target.value = ""; });
+on("btn-file", "click", () => $("file-input").click());
+on("file-input", "change", (ev) => { loadFile(ev.target.files?.[0]); ev.target.value = ""; });
 const drop = $("step-add");
 drop.addEventListener("dragover", (ev) => { ev.preventDefault(); drop.classList.add("drag"); });
 drop.addEventListener("dragleave", () => drop.classList.remove("drag"));
 drop.addEventListener("drop", (ev) => { ev.preventDefault(); drop.classList.remove("drag"); loadFile(ev.dataTransfer.files?.[0]); });
 
-$("btn-seal").addEventListener("click", sealReport);
-$("btn-tour").addEventListener("click", tour);
-$("welcome-close").addEventListener("click", () => {
+on("btn-seal", "click", sealReport);
+on("btn-tour", "click", tour);
+on("welcome-close", "click", () => {
   $("welcome").hidden = true;
   try { localStorage.setItem(WELCOME, "hidden"); } catch {}
 });
-$("welcome").addEventListener("click", (ev) => { if (ev.target.id === "open-setup") { ev.preventDefault(); $("setup").open = true; $("setup").scrollIntoView({ behavior: "smooth", block: "nearest" }); } });
+on("welcome", "click", (ev) => { if (ev.target.id === "open-setup") { ev.preventDefault(); $("setup").open = true; $("setup").scrollIntoView({ behavior: "smooth", block: "nearest" }); } });
 addEventListener("online", updateReadiness);
 addEventListener("offline", updateReadiness);
-$("btn-explain").addEventListener("click", explain);
-$("btn-save").addEventListener("click", saveCurrent);
-$("btn-speak").addEventListener("click", readAloud);
-$("btn-retry-cloud").addEventListener("click", () => { $("btn-retry-cloud").hidden = true; explain(); });
-$("btn-print").addEventListener("click", printSheet);
-$("btn-share").addEventListener("click", shareWithDoctor);
-$("share-box").addEventListener("click", async (ev) => {
+on("btn-explain", "click", explain);
+on("btn-save", "click", saveCurrent);
+on("btn-speak", "click", readAloud);
+on("btn-retry-cloud", "click", () => { $("btn-retry-cloud").hidden = true; explain(); });
+on("btn-print", "click", printSheet);
+on("btn-share", "click", shareWithDoctor);
+on("share-box", "click", async (ev) => {
   if (ev.target.id === "btn-copy-share") {
     $("share-url").select();
     try { await navigator.clipboard.writeText($("share-url").value); ev.target.textContent = "Copied"; } catch { document.execCommand("copy"); ev.target.textContent = "Copied"; }
@@ -661,8 +668,8 @@ $("share-box").addEventListener("click", async (ev) => {
     } catch (err) { ev.target.disabled = false; log("local", "Could not stop sharing: " + (err?.message || err)); }
   }
 });
-$("btn-trends").addEventListener("click", explainTrends);
-$("person").addEventListener("change", () => {
+on("btn-trends", "click", explainTrends);
+on("person", "change", () => {
   if ($("person").value === "__add") {
     $("add-person").hidden = false; $("new-person").focus();
     renderPeople(); return;
@@ -670,7 +677,7 @@ $("person").addEventListener("change", () => {
   $("trend-summary").hidden = true;
   renderHistory();
 });
-$("form-person").addEventListener("submit", (ev) => {
+on("form-person", "submit", (ev) => {
   ev.preventDefault();
   const name = $("new-person").value.trim();
   if (!name || !store) return;
@@ -680,23 +687,23 @@ $("form-person").addEventListener("submit", (ev) => {
   log("local", `Added ${name}. The name is stored only in this browser.`);
   renderHistory();
 });
-$("btn-back").addEventListener("click", () => { show("step-add"); $("step-review").hidden = true; setStep(1); });
-$("btn-new").addEventListener("click", () => {
+on("btn-back", "click", () => { show("step-add"); $("step-review").hidden = true; setStep(1); });
+on("btn-new", "click", () => {
   $("report").value = ""; $("file-note").hidden = true;
   $("step-review").hidden = true; $("step-explain").hidden = true; show("step-add"); setStep(1);
 });
-$("local-only").addEventListener("change", () => {
+on("local-only", "change", () => {
   $("language").disabled = localOnly();
   if (!$("step-review").hidden) renderReview();
   log("local", localOnly() ? "Device-only mode on: nothing will be sent to the cloud." : "Device-only mode off: the sealed version may be sent to the cloud.");
 });
-$("hidden-list").addEventListener("click", (ev) => {
+on("hidden-list", "click", (ev) => {
   const value = ev.target?.dataset?.unhide;
   if (!value) return;
   state.entities = state.entities.filter((e) => e.text !== value);
   renderReview();
 });
-$("form-hide").addEventListener("submit", (ev) => {
+on("form-hide", "submit", (ev) => {
   ev.preventDefault();
   const value = $("hide-input").value.trim();
   if (value && state.raw.toLowerCase().includes(value.toLowerCase())) {
@@ -705,12 +712,12 @@ $("form-hide").addEventListener("submit", (ev) => {
   }
   $("hide-input").value = "";
 });
-$("form-ask").addEventListener("submit", (ev) => {
+on("form-ask", "submit", (ev) => {
   ev.preventDefault();
   const q = $("ask-input").value.trim();
   if (q) { ask(q); $("ask-input").value = ""; }
 });
-$("history-list").addEventListener("click", async (ev) => {
+on("history-list", "click", async (ev) => {
   const open = ev.target.closest("[data-open]")?.dataset.open;
   const del = ev.target.closest("[data-del]")?.dataset.del;
   if (open) openSaved(open);

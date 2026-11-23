@@ -245,3 +245,6 @@ table.results .status.normal { background: var(--device-bg); color: var(--device
 .setup summary { cursor: pointer; font-weight: 600; }
 .setup ol { padding-left: 20px; margin: 10px 0 0; font-size: 14.5px; }
 .setup code { font: 13px var(--mono); background: #f4efe4; padding: 1px 5px; border-radius: 4px; user-select: all; }
+
+/* v5: comfortable tap targets for inline links (WCAG 2.5.8) */
+.ext-promo a, footer a, .note a, #ready a, #welcome a { display:inline-block; min-height:24px; padding:3px 0; line-height:18px; }
