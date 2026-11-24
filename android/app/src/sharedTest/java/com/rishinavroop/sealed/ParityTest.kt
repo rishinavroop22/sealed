@@ -74,6 +74,36 @@ class ParityTest {
         assertEquals(g.getString("count"), Health.countLine(out))
     }
 
+    @Test fun findsTheReportMonthLikeTheWebApp() {
+        for (d in golden.getJSONArray("months").objects()) assertEquals(d.getString("text"), d.getString("month"), Timeline.detectMonth(d.getString("text"), "2026-11"))
+    }
+
+    @Test fun buildsTheTimelineLikeTheWebApp() {
+        fun read(a: JSONArray) = a.objects().map { Finding(it.getString("test"), it.getString("value"), it.getString("reference")) }
+        val saved = golden.getJSONArray("saved").objects().mapIndexed { i, r -> Saved("$i", "me", r.getString("month"), read(r.getJSONArray("results"))) }
+        val series = Timeline.series(saved)
+        assertEquals(
+            golden.getJSONArray("series").objects().map { s ->
+                Series(s.getString("key"), s.getString("label"), s.getString("unit"), s.getString("reference"), s.getJSONArray("points").objects().map { Point(it.getString("month"), it.getDouble("value"), it.getString("reference"), it.getString("status")) })
+            },
+            series,
+        )
+        val said = golden.getJSONArray("sentences")
+        assertEquals((0 until said.length()).map { said.getString(it) }, series.map { Timeline.sentence(it) })
+        val order = golden.getJSONArray("notable")
+        assertEquals((0 until order.length()).map { order.getString(it) }, Timeline.notableFirst(series).map { it.key })
+        assertEquals(read(golden.getJSONArray("merged")), Timeline.merge(read(golden.getJSONObject("findings").getJSONArray("input")), Health.quickParse(golden.getJSONArray("reports").getJSONObject(0).getString("text"))))
+    }
+
+    @Test fun savesAndReadsTheSameExplanation() {
+        val e = Explanation("All fine", "Call a doctor", listOf(Finding("TSH", "6.9", "0.4 - 4.0", "high", "Above range")), listOf("Why?"))
+        assertEquals(e, ModelJson.explanation(ModelJson.write(e)))
+    }
+
+    @Test fun hidesPlaceholdersWhenTheNamesAreNotHere() {
+        assertEquals("the patient saw the doctor at (hidden)", Redactor.neutral("[NAME_1] saw [DOCTOR_2] at [FACILITY_1]"))
+    }
+
     @Test fun labelsComeFromCodeNotTheModel() {
         val (out, corrected) = Health.check(listOf(
             Finding("TSH", "6.9", "0.4 - 4.0", "normal", "fine"),

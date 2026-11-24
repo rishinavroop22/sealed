@@ -47,6 +47,175 @@ class SealedViewModel(app: Application) : AndroidViewModel(app) {
     val ledger = mutableStateListOf<LedgerEntry>()
 
     private var raw = ""
+
+    // ---------- saved history ----------
+    private val store = Store(app)
+    private val voice = Voice(app)
+    var people by mutableStateOf(store.people()); private set
+    var person by mutableStateOf(people.first().id); private set
+    var items by mutableStateOf(listOf<Saved>()); private set
+    var historyNote by mutableStateOf<String?>(null); private set
+    var month by mutableStateOf("")
+    var saved by mutableStateOf(false); private set
+    var opened by mutableStateOf(false); private set // showing a report from history
+    var linked by mutableStateOf(store.family != null); private set
+    var invite by mutableStateOf<Invite?>(null); private set
+    var trend by mutableStateOf<Reply?>(null); private set
+    var speaking by mutableStateOf(false); private set
+
+    val everyone get() = people + Person(Timeline.SAMPLE_ID, "Lakshmi (sample)")
+    val personName get() = everyone.firstOrNull { it.id == person }?.name ?: "Me"
+    val mine get() = items.filter { it.profile == person } + if (person == Timeline.SAMPLE_ID) Timeline.SAMPLES else emptyList()
+
+    fun choose(id: String) {
+        person = id
+        trend = null
+        saved = false
+    }
+
+    fun addPerson(name: String) {
+        if (name.isBlank()) return
+        val p = store.addPerson(name)
+        people = store.people()
+        choose(p.id)
+        log("local", "Added ${p.name}. The name is stored only on this phone.")
+    }
+
+    private suspend fun reload() {
+        try {
+            items = store.list()
+            historyNote = null
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            historyNote = "History could not be loaded. ${short(e)}"
+        }
+        linked = store.family != null
+    }
+
+    fun refreshHistory() { viewModelScope.launch { reload() } }
+
+    fun save() {
+        val s = sealed ?: return
+        val ex = shown ?: return
+        if (month.isNotEmpty() && !Timeline.isMonth(month)) {
+            error = "Write the month as year-month, for example 2026-05."
+            return
+        }
+        task("Saving the sealed copy…") {
+            store.save(
+                Saved("", person, month, Timeline.merge(ex.data.findings, Health.quickParse(s.text)), s.text, ex.data, ex.where, if (ex.where == "cloud") language else "English", s.map.size),
+                s.map,
+            )
+            saved = true
+            log("cloud", "Saved the sealed copy to $personName's timeline (Firestore): sealed text, results and the month only. Names and the key that restores them stayed on this phone.", s.text)
+            reload()
+        }
+    }
+
+    fun openSaved(r: Saved) {
+        val ex = r.explanation ?: Explanation("")
+        report = ""
+        startOver()
+        sealed = Sealed(r.sealed, store.keyFor(r.id))
+        month = r.month
+        opened = true
+        shown = Shown(ex.copy(findings = Health.check(ex.findings).first), r.where, "Opened from your history." + if (store.keyFor(r.id).isEmpty()) " The names are not on this phone." else "", Health.criticalFindings(ex.findings))
+        log("local", "Opened a saved report from history.")
+    }
+
+    fun delete(r: Saved) = task("Deleting…") {
+        store.delete(r.id)
+        trend = null
+        log("local", "Deleted a saved report.")
+        reload()
+    }
+
+    fun view(t: String): String = sealed?.let { if (it.map.isEmpty() && opened) Redactor.neutral(t) else Redactor.unseal(t, it.map) } ?: t
+
+    // ---------- changes over time ----------
+    fun explainTrend(series: List<Series>) {
+        val facts = series.take(10).joinToString("\n") { Timeline.sentence(it) }
+        val local = deviceOnly || !online()
+        task("Writing a summary…") {
+            if (local && device != "available") {
+                trend = Reply("", facts, "local")
+                log("local", "Changes worked out by code on this phone, with no AI.")
+                return@task
+            }
+            val prompt = Prompts.trend(facts)
+            try {
+                val a = ai.trend(prompt, local)
+                trend = Reply("", a.text, a.where)
+                if (a.where == "cloud") log("cloud", "Trend summary: only test names, numbers and months were sent to the cloud.", prompt)
+                else log("device", "Trend summary written on this phone from facts worked out by code. Nothing was sent.")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                trend = Reply("", facts, "local")
+                log(if (local) "local" else "cloud", "The summary could not be written by AI: ${short(e)}", if (local) null else prompt)
+            }
+        }
+    }
+
+    // ---------- family link ----------
+    fun readInvite(text: String) {
+        invite = store.readInvite(text)
+        error = if (invite == null) "This is not a Sealed code. On the laptop, open Sealed and choose Link a phone." else null
+    }
+
+    // Reports saved here under "Me" join the other device's person with the same id.
+    fun mergeNote(i: Invite): String {
+        val other = i.people.firstOrNull { it.id == "me" }?.name ?: return ""
+        return if (items.any { it.profile == "me" }) "\n\nReports already saved on this phone under \"${people.first { it.id == "me" }.name}\" will appear under \"$other\"." else ""
+    }
+
+    fun cancelInvite() { invite = null }
+
+    fun join() {
+        val i = invite ?: return
+        task("Linking this phone…") {
+            try {
+                store.join(i)
+            } catch (e: com.google.firebase.firestore.FirebaseFirestoreException) {
+                invite = null
+                if (e.code == com.google.firebase.firestore.FirebaseFirestoreException.Code.PERMISSION_DENIED) error("This code has expired. Make a new one on the other device.")
+                throw e
+            }
+            invite = null
+            people = store.people()
+            if (everyone.none { it.id == person }) person = people.first().id
+            log("cloud", "Linked this phone to a family timeline: sealed reports only. The names came from the code and were not sent.")
+            reload()
+        }
+    }
+
+    fun leave() = task("Unlinking this phone…") {
+        store.leave()
+        log("local", "Unlinked this phone. The shared timeline stays on your other devices.")
+        reload()
+    }
+
+    fun scanFailed(message: String) { error = message }
+
+    // ---------- read aloud ----------
+    fun readAloud() {
+        if (speaking) {
+            voice.stop()
+            speaking = false
+            return
+        }
+        val d = shown?.data ?: return
+        val lang = if (shown?.where == "cloud") language else "English"
+        val text = (listOf(Health.countLine(d.findings).takeIf { lang == "English" }.orEmpty(), d.summary, d.urgent) +
+            d.findings.filter { it.status != "normal" }.map { "${it.test}. ${it.meaning}" } + d.questions)
+            .filter { it.isNotBlank() }.joinToString("\n") { view(it) }
+        voice.speak(text, lang, onDone = { speaking = false }, onMissing = { speaking = false; error = "This phone has no $lang voice. Add one in Settings, under Text-to-speech." })
+        speaking = true
+        log("local", "Reading the explanation aloud in $lang with this phone's own voice. Nothing was sent.")
+    }
+
+    override fun onCleared() { voice.close() }
     val cloudModel get() = ai.cloudModel
 
     private fun log(where: String, text: String, sent: String? = null) {
@@ -58,6 +227,7 @@ class SealedViewModel(app: Application) : AndroidViewModel(app) {
             ai.loadConfig()
             refreshDevice()
         }
+        viewModelScope.launch { reload() }
     }
 
     private suspend fun refreshDevice() {
@@ -115,6 +285,16 @@ class SealedViewModel(app: Application) : AndroidViewModel(app) {
         earlyAlerts = emptyList()
         proof = null
         replies.clear()
+        saved = false
+        opened = false
+        month = ""
+        if (speaking) voice.stop()
+        speaking = false
+    }
+
+    fun useSample() {
+        setText(SAMPLE)
+        choose(Timeline.SAMPLE_ID)
     }
 
     fun open(uri: Uri) = task("Reading the file on this phone…") {
@@ -170,6 +350,7 @@ class SealedViewModel(app: Application) : AndroidViewModel(app) {
             entities = found
             sealed = Redactor.seal(text, found)
             earlyAlerts = Health.criticalFindings(Health.quickParse(text))
+            month = Timeline.detectMonth(text)
         }
     }
 
@@ -230,6 +411,7 @@ class SealedViewModel(app: Application) : AndroidViewModel(app) {
         val (checked, corrected) = Health.check(matched)
         if (corrected > 0) log("local", "Range check corrected $corrected result label${if (corrected == 1) "" else "s"} the model got wrong.")
         shown = Shown(data.copy(findings = checked), where, note, Health.criticalFindings(checked))
+        saved = false
     }
 
     // On the phone, code reads every result and decides every label. The small model only writes the summary.

@@ -46,6 +46,16 @@ object Health {
         return null
     }
 
+    // Low and high limits of one clear range, for the chart.
+    fun bounds(reference: String): Pair<Double?, Double?>? {
+        val ref = reference.replace(",", "")
+        if (severalRanges(ref)) return null
+        RANGE.find(ref)?.let { return it.groupValues[1].toDouble() to it.groupValues[2].toDouble() }
+        UNDER.find(ref)?.let { return null to it.groupValues[2].toDouble() }
+        OVER.find(ref)?.let { return it.groupValues[2].toDouble() to null }
+        return null
+    }
+
     private val PLAIN = mapOf("low" to "below", "normal" to "within", "high" to "above")
 
     fun plainMeaning(status: String, reference: String) =
@@ -174,12 +184,17 @@ object Health {
     }
 
     // ---------- quick parse ----------
-    private val NOT_A_TEST = Regex("""^(page|lab|sample|barcode|ref|age|dob|date|report|uhid|mrd|bill|phone|ph|patient|name|time|received|collected|registered|printed|reported)\b""", I)
+    private val NOT_A_TEST = Regex("""^(page|lab|sample|barcode|ref|age|dob|date|report|uhid|mrd|bill|phone|ph|patient|name|time|received|collected|registered|printed|reported|bed|ward|room|class|policy|emp|employee|order|booking|aadhaa?r|abha|mobile|contact|pin|token|visit|invoice|receipt|card|claim)\b""", I)
     private const val METHODS = """photometry|spectrophotometry|calculated|calculation|immunoassay|c\.?l\.?i\.?a|e\.?c\.?l\.?i\.?a|elisa|hplc|turbidimetry|nephelometry|potentiometry|ise(?:\s+direct|\s+indirect)?|colorimetric|enzymatic|flow\s+cytometry|automated|impedance|derived"""
     private val LINE = Regex("""^\s*([A-Za-z][A-Za-z0-9 ().,/'+\-]{1,60}?)\s+(?:(?:$METHODS)\s+)?(-?\d[\d,]*(?:\.\d+)?)\s*([A-Za-zµ%][A-Za-z%µ/^0-9.]*)?\s*(.*)$""", I)
     private val REF = Regex("""((?:<|>|<=|>=|≤|≥|up\s*to|upto|less\s+than|below|more\s+than|above)\s*\d[\d.,]*|\d[\d.,]*\s*(?:-|–|to)\s*\d[\d.,]*)""", I)
 
-    private fun parseLine(line: String): Finding? {
+    private val BARS = Regex("""[\t ]*\|[\t ]*""")
+    private val COLON = Regex("""^([ \t]*[A-Za-z](?:[^:]{0,59}[^:\d])?|[ \t]*[A-Za-z][^:]{0,60}(?=:[ \t])):[ \t]*(?=-?\d)""")
+
+    private fun parseLine(printed: String): Finding? {
+        // "TSH | 6.9 | uIU/mL | 0.4 - 4.0" and "TSH: 6.9 uIU/mL (Ref: 0.4 - 4.0)" read the same as a printed table.
+        val line = COLON.replace(BARS.replace(printed, "  "), "$1 ")
         val m = LINE.find(line) ?: return null
         val name = m.groupValues[1]
         if (NOT_A_TEST.containsMatchIn(name)) return null

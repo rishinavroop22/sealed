@@ -70,7 +70,8 @@ export const configReady = (async () => {
 })();
 
 // ---------- Firebase AI Logic ----------
-const ai = getAI(app, { backend: new GoogleAIBackend() });
+// One-time App Check tokens: a stolen token cannot be used for a second request.
+const ai = getAI(app, { backend: new GoogleAIBackend(), useLimitedUseAppCheckTokens: true });
 
 const textIO = {
   expectedInputs: [{ type: "text", languages: ["en"] }],

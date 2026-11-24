@@ -1,5 +1,6 @@
 package com.rishinavroop.sealed
 
+import org.json.JSONArray
 import org.json.JSONObject
 
 data class Explanation(
@@ -40,4 +41,12 @@ object ModelJson {
             questions = (0 until (q?.length() ?: 0)).map { q!!.optString(it) }.filter { it.isNotBlank() },
         )
     }
+
+    // The same shape the web app saves.
+    fun write(e: Explanation): String = JSONObject()
+        .put("summary", e.summary).put("urgent", e.urgent)
+        .put("findings", JSONArray().apply {
+            e.findings.forEach { put(JSONObject().put("test", it.test).put("value", it.value).put("reference", it.reference).put("status", it.status).put("meaning", it.meaning)) }
+        })
+        .put("questions", JSONArray(e.questions)).toString()
 }

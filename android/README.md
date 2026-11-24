@@ -9,7 +9,10 @@ The same hybrid design as the web app: Gemini Nano on the phone and Gemini in th
 3. **Check what leaves.** Read the sealed text, hide more, or share the sealed version.
 4. **Explain.** Only sealed text goes to the cloud model, in 9 Indian languages. Offline or in device-only mode, it stays on the phone.
 5. **Code checks the AI.** Every high or low label comes from code and the range printed on the report. Dangerous values raise an alert before any AI runs.
-6. **Privacy ledger.** Every step, with the exact text of every request, including requests that failed.
+6. **Save and compare.** Sealed copies are saved per family member, and values are charted over time with each report's own range. Names, and the key that restores them, stay on the phone.
+7. **Link with the laptop.** Scan the QR code the web app shows, and both share one sealed timeline. Names travel inside the code only. The scanner needs no camera permission.
+8. **Read aloud** with the phone's own voices.
+9. **Privacy ledger.** Every step, with the exact text of every request, including requests that failed.
 
 ## Routes
 
@@ -19,6 +22,7 @@ The same hybrid design as the web app: Gemini Nano on the phone and Gemini in th
 | Read a PDF | Bundled text recognition (on the phone) |
 | Seal | Pattern rules, plus `ONLY_ON_DEVICE` |
 | Explanation | `PREFER_IN_CLOUD`; `ONLY_ON_DEVICE` when offline or in device-only mode |
+| Explain changes over time | `PREFER_IN_CLOUD` with test names, numbers and months only; `ONLY_ON_DEVICE` when offline or in device-only mode |
 | Quick questions | `PREFER_ON_DEVICE` (set by Remote Config `quick_route`); `ONLY_ON_DEVICE` when offline or in device-only mode |
 
 On phones without Gemini Nano, sealing uses pattern rules only and says so. The report is never sent to the cloud to be sealed.
@@ -42,7 +46,7 @@ Minimum Android version: 9 (API 28). Gemini Nano needs a supported phone, for ex
 
 ## Tests
 
-`ParityTest` checks that the Kotlin sealing and range-check code gives the same output as the web app's JavaScript. It runs on the JVM and on a phone, because Android has a different regular-expression engine. All test reports are invented.
+`ParityTest` checks that the Kotlin sealing, range-check and timeline code gives the same output as the web app's JavaScript. It runs on the JVM and on a phone, because Android has a different regular-expression engine. `QrTest` reads the web app's QR codes with a standard reader (ZXing). All test reports are invented.
 
 ```
 node android/parity.mjs                     # refresh expected output from web/js

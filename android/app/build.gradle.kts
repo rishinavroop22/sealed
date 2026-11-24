@@ -51,6 +51,11 @@ dependencies {
     implementation("com.google.firebase:firebase-appcheck-debug")
     implementation("com.google.firebase:firebase-appcheck-playintegrity")
     implementation("com.google.firebase:firebase-config")
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-firestore")
+
+    // Scans the family code. Needs no camera permission.
+    implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
 
     // On-device text recognition, bundled in the app, for photos and PDFs on any phone.
     implementation("com.google.mlkit:text-recognition:16.0.1")
@@ -63,6 +68,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation("com.google.zxing:core:3.5.3") // reads the web app's QR codes in a test
     testImplementation("org.json:json:20250517")
     androidTestImplementation("androidx.test:runner:1.7.0")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")

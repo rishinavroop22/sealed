@@ -22,6 +22,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -38,20 +40,20 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 // Same colours as web/css/app.css.
-private val Wax = Color(0xFFA8281D)
-private val Paper = Color(0xFFF6F1E7)
-private val CardColor = Color(0xFFFFFDF8)
-private val Ink = Color(0xFF1D1B16)
-private val Muted = Color(0xFF6B6558)
-private val Line = Color(0xFFE2D9C6)
-private val ChipBg = Color(0xFFEFE9DB)
-private val DeviceGreen = Color(0xFF1F6F54)
-private val DeviceBg = Color(0xFFE3F1EA)
-private val CloudBlue = Color(0xFF2B4F9C)
-private val CloudBg = Color(0xFFE4EAF7)
-private val Warn = Color(0xFF8A5A00)
-private val WarnBg = Color(0xFFFBF0D4)
-private val AlertBg = Color(0xFFFBE4E1)
+internal val Wax = Color(0xFFA8281D)
+internal val Paper = Color(0xFFF6F1E7)
+internal val CardColor = Color(0xFFFFFDF8)
+internal val Ink = Color(0xFF1D1B16)
+internal val Muted = Color(0xFF6B6558)
+internal val Line = Color(0xFFE2D9C6)
+internal val ChipBg = Color(0xFFEFE9DB)
+internal val DeviceGreen = Color(0xFF1F6F54)
+internal val DeviceBg = Color(0xFFE3F1EA)
+internal val CloudBlue = Color(0xFF2B4F9C)
+internal val CloudBg = Color(0xFFE4EAF7)
+internal val Warn = Color(0xFF8A5A00)
+internal val WarnBg = Color(0xFFFBF0D4)
+internal val AlertBg = Color(0xFFFBE4E1)
 
 private val LANGUAGES = listOf("English", "Hindi", "Telugu", "Tamil", "Kannada", "Malayalam", "Marathi", "Bengali", "Gujarati")
 
@@ -85,6 +87,7 @@ class MainActivity : ComponentActivity() {
     // A report shared from another app (photo, PDF or text), or text selected anywhere.
     private fun receive(intent: Intent?) {
         when (intent?.action) {
+            Intent.ACTION_VIEW -> intent.data?.let { vm.readInvite(it.toString()) } // a code opened from the phone's camera
             Intent.ACTION_PROCESS_TEXT -> intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.let { vm.setText(it.toString()) }
             Intent.ACTION_SEND -> {
                 val uri = if (Build.VERSION.SDK_INT >= 33) intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
@@ -98,16 +101,21 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun SealedScreen(vm: SealedViewModel) {
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let { vm.open(it) } }
+    val scroll = rememberScrollState()
+    var explainAt by remember { mutableIntStateOf(0) }
+    LaunchedEffect(vm.shown) { if (vm.opened && vm.shown != null) { withFrameNanos {}; scroll.animateScrollTo(explainAt) } }
 
     Box(Modifier.fillMaxSize().background(Paper).safeDrawingPadding()) {
         Column(
-            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+            Modifier.fillMaxSize().verticalScroll(scroll).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Header(vm)
             AddStep(vm) { picker.launch(arrayOf("image/*", "application/pdf", "text/plain")) }
-            vm.sealed?.let { ReviewStep(vm, it) }
-            vm.shown?.let { ex -> vm.sealed?.let { ExplainStep(vm, ex, it) } }
+            vm.sealed?.let { if (!vm.opened) ReviewStep(vm, it) }
+            vm.shown?.let { ex -> Box(Modifier.onGloballyPositioned { explainAt = it.positionInParent().y.toInt() }) { ExplainStep(vm, ex) } }
+            TimelinePanel(vm)
+            HistoryPanel(vm)
             Ledger(vm)
             Spacer(Modifier.height(72.dp))
         }
@@ -147,6 +155,7 @@ private fun Header(vm: SealedViewModel) {
             }
             Switch(checked = vm.deviceOnly, onCheckedChange = { vm.deviceOnly = it }, modifier = Modifier.semantics { contentDescription = "Device-only mode" })
         }
+        PersonPicker(vm)
         Text("Explain in", fontSize = 13.sp, color = Muted)
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             LANGUAGES.forEach { l ->
@@ -161,7 +170,7 @@ private fun AddStep(vm: SealedViewModel, choose: () -> Unit) = Panel {
     Title("1. Add a report")
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedButton(onClick = choose, enabled = vm.busy == null) { Text("Photo or PDF") }
-        OutlinedButton(onClick = { vm.setText(SAMPLE) }, enabled = vm.busy == null) { Text("Use a sample") }
+        OutlinedButton(onClick = { vm.useSample() }, enabled = vm.busy == null) { Text("Use a sample") }
     }
     vm.fileNote?.let { Note(it, DeviceGreen, DeviceBg) }
     OutlinedTextField(
@@ -233,9 +242,9 @@ private fun ReviewStep(vm: SealedViewModel, s: Sealed) = Panel {
 }
 
 @Composable
-private fun ExplainStep(vm: SealedViewModel, ex: Shown, s: Sealed) = Panel {
+private fun ExplainStep(vm: SealedViewModel, ex: Shown) = Panel {
     var question by remember { mutableStateOf("") }
-    fun view(t: String) = Redactor.unseal(t, s.map) // names restored on this phone, for your eyes only
+    fun view(t: String) = vm.view(t) // names restored on this phone, for your eyes only
 
     Title("3. Your explanation")
     when (ex.where) {
@@ -244,6 +253,7 @@ private fun ExplainStep(vm: SealedViewModel, ex: Shown, s: Sealed) = Panel {
         else -> Chip("Read by code on this phone", Muted, ChipBg)
     }
     if (ex.note.isNotBlank()) Text(ex.note, fontSize = 13.sp, color = Muted)
+    OutlinedButton(onClick = { vm.readAloud() }) { Text(if (vm.speaking) "Stop reading" else "Read aloud") }
     Alerts(ex.critical)
     Health.countLine(ex.data.findings).let { if (it.isNotEmpty()) Text(it, fontWeight = FontWeight.SemiBold) }
     Text(view(ex.data.summary))
@@ -254,6 +264,8 @@ private fun ExplainStep(vm: SealedViewModel, ex: Shown, s: Sealed) = Panel {
         ex.data.questions.forEachIndexed { i, q -> Text("${i + 1}. ${view(q)}") }
     }
     Text("High and low labels are decided by code from the range printed on the report. Sealed does not diagnose or replace your doctor.", fontSize = 12.sp, color = Muted)
+
+    if (!vm.opened) SaveRow(vm)
 
     HorizontalDivider(color = Line)
     OutlinedTextField(question, { question = it }, Modifier.fillMaxWidth(), label = { Text("Ask a quick question") })
@@ -318,7 +330,7 @@ private fun Alerts(items: List<Critical>) {
 }
 
 @Composable
-private fun Panel(content: @Composable ColumnScope.() -> Unit) {
+internal fun Panel(content: @Composable ColumnScope.() -> Unit) {
     Card(
         colors = CardDefaults.cardColors(containerColor = CardColor, contentColor = Ink),
         border = BorderStroke(1.dp, Line), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(),
@@ -326,10 +338,10 @@ private fun Panel(content: @Composable ColumnScope.() -> Unit) {
 }
 
 @Composable
-private fun Title(text: String) = Text(text, fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Serif, fontSize = 20.sp, modifier = Modifier.semantics { heading() })
+internal fun Title(text: String) = Text(text, fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Serif, fontSize = 20.sp, modifier = Modifier.semantics { heading() })
 
 @Composable
-private fun Note(text: String, fg: Color, bg: Color) =
+internal fun Note(text: String, fg: Color, bg: Color) =
     Text(text, color = fg, fontSize = 14.sp, modifier = Modifier.fillMaxWidth().background(bg, RoundedCornerShape(10.dp)).padding(10.dp).semantics { liveRegion = LiveRegionMode.Polite })
 
 @Composable
@@ -345,7 +357,7 @@ private fun Busy(text: String) {
 }
 
 @Composable
-private fun Chip(text: String, fg: Color, bg: Color) =
+internal fun Chip(text: String, fg: Color, bg: Color) =
     Text(text, color = fg, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.background(bg, RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 4.dp))
 
 const val SAMPLE = """CITY DIAGNOSTICS & RESEARCH CENTRE
@@ -355,6 +367,7 @@ Patient Name: Mrs. Lakshmi Devi Rao        Age: 54 Years    Sex: Female
 UHID: HYD/2291/88        Lab No: CD-774120
 Ref. By: Dr. Arvind Menon        Phone: +91 98480 12345
 DOB: 14/03/1972
+Sample Collected on: 06/11/2026
 
 TEST                     RESULT      UNIT        REFERENCE RANGE
 Haemoglobin              9.8         g/dL        12.0 - 15.0

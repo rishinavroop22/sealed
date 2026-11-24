@@ -267,12 +267,14 @@ export function watchCloudAI() {
 // Reads "Test name [METHOD] value unit range" lines straight from the report text with fixed rules,
 // so critical values are flagged the moment a report is added (even offline) and the timeline
 // does not depend on which tests an AI explanation chose to mention.
-const NOT_A_TEST = /^(page|lab|sample|barcode|ref|age|dob|date|report|uhid|mrd|bill|phone|ph|patient|name|time|received|collected|registered|printed|reported)\b/i;
+const NOT_A_TEST = /^(page|lab|sample|barcode|ref|age|dob|date|report|uhid|mrd|bill|phone|ph|patient|name|time|received|collected|registered|printed|reported|bed|ward|room|class|policy|emp|employee|order|booking|aadhaa?r|abha|mobile|contact|pin|token|visit|invoice|receipt|card|claim)\b/i;
 // Method words some labs print between the test name and the value.
 const METHODS = "photometry|spectrophotometry|calculated|calculation|immunoassay|c\\.?l\\.?i\\.?a|e\\.?c\\.?l\\.?i\\.?a|elisa|hplc|turbidimetry|nephelometry|potentiometry|ise(?:\\s+direct|\\s+indirect)?|colorimetric|enzymatic|flow\\s+cytometry|automated|impedance|derived";
 export function quickParse(raw) {
   const out = [];
-  for (const line of String(raw || "").split(/\r?\n/)) {
+  for (const printed of String(raw || "").split(/\r?\n/)) {
+    // "TSH | 6.9 | uIU/mL | 0.4 - 4.0" and "TSH: 6.9 uIU/mL (Ref: 0.4 - 4.0)" read the same as a printed table.
+    const line = printed.replace(/[\t ]*\|[\t ]*/g, "  ").replace(/^([ \t]*[A-Za-z](?:[^:]{0,59}[^:\d])?|[ \t]*[A-Za-z][^:]{0,60}(?=:[ \t])):[ \t]*(?=-?\d)/, "$1 ");
     const m = line.match(new RegExp(String.raw`^\s*([A-Za-z][A-Za-z0-9 ().,\/'+-]{1,60}?)\s+(?:(?:${METHODS})\s+)?(-?\d[\d,]*(?:\.\d+)?)\s*([A-Za-zµ%][A-Za-z%µ\/^0-9.]*)?\s*(.*)$`, "i"));
     if (!m || NOT_A_TEST.test(m[1])) continue;
     const key = normaliseTest(m[1]);

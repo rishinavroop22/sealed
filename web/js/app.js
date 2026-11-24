@@ -3,8 +3,9 @@
 import {
   getModels, deviceModelStatus, warmDeviceModel, appCheckReady, debugToken, sourceOf, configReady,
 } from "./firebase.js";
-import { findPatternEntities, mergeEntities, seal, sealQuestion, unseal, chunk, readJson, checkFindings, countLine } from "./redact.js";
+import { findPatternEntities, mergeEntities, seal, sealQuestion, unseal, chunk, readJson, checkFindings, countLine, SEAL_PROMPT } from "./redact.js";
 import { readFile } from "./ingest.js";
+import { qrSvg } from "./qr.js";
 import {
   criticalFindings, quickParse, detectMonth, monthLabel, buildSeries, trendSentence, sparkline,
   speak, stopSpeaking, voiceFor, watchCloudAI, mergeResults, reconcile, trendFacts, notableFirst,
@@ -157,13 +158,6 @@ async function loadFile(file) {
 }
 
 // ---------- step 1 -> 2: seal on device ----------
-const SEAL_PROMPT = (text) => `List the personal identifiers in this medical document: names of the patient, relatives and doctors; hospital and lab names; street addresses; ID numbers; phone numbers; emails; dates of birth.
-Copy only the identifying words exactly as written, never the field label or a whole sentence. Never list tests, results, units, ranges, age or sex.
-Return JSON: {"entities":[{"text":"...","type":"NAME|DOCTOR|FACILITY|ADDRESS|ID|CONTACT|DOB"}]}
-
-DOCUMENT:
-${text}`;
-
 async function sealReport() {
   const raw = $("report").value.trim();
   if (!raw) { $("report").focus(); return; }
@@ -370,7 +364,8 @@ async function saveCurrent() {
       sealed: state.sealed, explanation: state.explanation, where: state.explainWhere,
       language: localOnly() ? "English" : language(), hidden: Object.keys(state.map).length,
       profile: person(), month: $("report-month").value || state.month,
-      results: mergeResults(state.explanation?.findings, quickParse(state.raw)),
+      // From the sealed text only: a line of the original such as "Asha Rao, 54" could look like a result.
+      results: mergeResults(state.explanation?.findings, quickParse(state.sealed)),
     }, state.map);
     btn.textContent = "Saved";
     log("cloud", `Saved the sealed copy to ${personName()}'s timeline (Firestore): sealed text, results and the month only. Names and the key that restores them stayed on this device.`, state.sealed);
@@ -593,6 +588,78 @@ function printSheet() {
   window.print();
 }
 
+// ---------- family link ----------
+function renderLink() {
+  const linked = !!store?.family();
+  $("btn-link").textContent = linked ? "Link another device" : "Link a phone";
+  $("btn-unlink").hidden = !linked;
+  $("link-note").textContent = linked
+    ? "This browser shares one sealed family timeline with your other devices. Names are not in it."
+    : "Show one family timeline on your laptop and phone. Only sealed reports are shared. Names travel inside the code, never through the cloud.";
+}
+let qrTimer = null;
+async function linkPhone() {
+  const btn = $("btn-link"), box = $("qr-box");
+  btn.disabled = true;
+  box.hidden = false; box.innerHTML = `<p class="note">Preparing the code…</p>`;
+  try {
+    await storeReady;
+    if (!store) throw new Error("History is not available in this browser.");
+    const code = await store.createInvite();
+    const url = new URL(`./#join=${code}`, location.href).href;
+    box.innerHTML = `<div class="qr">${qrSvg(url, "QR code to link a phone")}</div>
+      <div><p><strong>Scan this with your phone.</strong> Use the camera, or "Scan a code" in the Sealed Android app.</p>
+      <p class="note small">Works for 10 minutes. Show it only to your family: it holds the names in your list.</p>
+      <button class="ghost" id="btn-copy-join" type="button">Copy the code as a link</button></div>`;
+    $("btn-copy-join").addEventListener("click", async (ev) => {
+      try { await navigator.clipboard.writeText(url); ev.target.textContent = "Copied"; } catch { ev.target.textContent = "Could not copy"; }
+    });
+    clearTimeout(qrTimer);
+    qrTimer = setTimeout(() => { box.hidden = true; box.innerHTML = ""; }, 10 * 60 * 1000);
+    log("cloud", "Opened this family timeline to new devices for 10 minutes. Sealed reports only; the names are inside the code on screen and were not sent.");
+    renderLink(); renderHistory();
+  } catch (err) {
+    console.warn("[Sealed] link failed:", err);
+    box.innerHTML = `<p class="note warn">Could not prepare the code: ${esc(err?.message || err)}</p>`;
+  }
+  btn.disabled = false;
+}
+let invite = null;
+async function checkInvite() {
+  const code = location.hash.match(/^#join=([A-Za-z0-9_-]+)$/)?.[1];
+  if (!code) return;
+  history.replaceState(null, "", location.pathname + location.search); // keep the code out of the address bar
+  await storeReady;
+  invite = store?.decodeInvite(code);
+  $("join").hidden = false;
+  if (!invite) {
+    $("join-people").textContent = "This code is not a valid Sealed code.";
+    $("btn-join").hidden = true;
+    return;
+  }
+  // Reports saved here under "Me" join the other device's person with the same id.
+  const other = invite.p.find((p) => p.id === "me"), mine = store.people().find((p) => p.id === "me");
+  $("join-people").textContent = `People in it: ${invite.p.map((p) => p.name).join(", ")}.` +
+    (other && mine && historyItems.some((i) => i.profile === "me") ? ` Reports already saved on this device under "${mine.name}" will appear under "${other.name}".` : "");
+  if (/Android/.test(navigator.userAgent)) { $("btn-join-app").hidden = false; $("btn-join-app").href = `sealed://join?d=${code}`; }
+  $("join").scrollIntoView({ block: "start" });
+}
+async function join() {
+  $("btn-join").disabled = true;
+  $("join-status").textContent = "Linking…";
+  try {
+    await store.joinFamily(invite);
+    $("join").hidden = true;
+    renderPeople(); renderLink(); renderHistory();
+    log("cloud", "Linked this device to a family timeline: sealed reports only. The names came from the code and were not sent.");
+    $("timeline-card").scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (err) {
+    console.warn("[Sealed] join failed:", err);
+    $("join-status").textContent = err?.code === "permission-denied" ? "This code has expired. Make a new one on the other device." : "Could not link: " + (err?.message || err);
+    $("btn-join").disabled = false;
+  }
+}
+
 // ---------- first-run guidance ----------
 const WELCOME = "sealed.welcome.v1";
 function showWelcome() {
@@ -732,7 +799,20 @@ on("history-list", "click", async (ev) => {
 });
 
 refreshStatus().then(showWelcome);
-storeReady.then(() => { renderPeople(); renderHistory(); });
+storeReady.then(() => { renderPeople(); renderLink(); renderHistory(); });
+on("btn-link", "click", linkPhone);
+on("btn-unlink", "click", async () => {
+  $("btn-unlink").disabled = true;
+  await store.leaveFamily();
+  $("btn-unlink").disabled = false;
+  $("qr-box").hidden = true;
+  log("local", "Unlinked this browser. The shared timeline stays on your other devices.");
+  renderLink(); renderHistory();
+});
+on("btn-join", "click", join);
+on("btn-join-no", "click", () => { $("join").hidden = true; invite = null; });
+addEventListener("hashchange", checkInvite);
+checkInvite();
 if ("speechSynthesis" in self) speechSynthesis.getVoices();
 configReady.then((c) => { $("chip-model").textContent = `Cloud model: ${c.cloudModel}`; });
 if (debugToken) {

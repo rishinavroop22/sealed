@@ -4,7 +4,7 @@
 
 Live demo: https://rishinavroop22.github.io/sealed/
 
-Sealed is a web app for patients and families. It reads a lab report or prescription with an AI model that runs inside the browser, removes everything that identifies the person, shows exactly what is left, and only then sends that sealed version to a cloud model for a full plain-language explanation. In device-only mode, or with no network, nothing is sent at all.
+Sealed is a web app, an Android app and a Chrome extension for patients and families. It reads a lab report or prescription with an AI model that runs on the device, removes everything that identifies the person, shows exactly what is left, and only then sends that sealed version to a cloud model for a full plain-language explanation. In device-only mode, or with no network, nothing is sent at all.
 
 Built for [#BuildHybridAI 2026](https://firebasehybridaihackathon.devpost.com/) with **Firebase AI Logic hybrid inference**.
 
@@ -15,7 +15,9 @@ Built for [#BuildHybridAI 2026](https://firebasehybridaihackathon.devpost.com/) 
 3. Click **Send sealed version for explanation**. Only the sealed text goes to Gemini in the cloud (shown word for word in the Privacy ledger). Switch the language to Hindi or Tamil and explain again.
 4. Click **Save sealed copy to history**, then **Explain these changes** on the timeline: a sample family member already has two earlier reports.
 5. Try **Share with a doctor** (a read-only link that expires in 7 days) and **Print for the doctor**.
-6. Turn on **Device-only mode**, or switch Wi-Fi off after the first load: sealing, explanation and questions still work on Gemini Nano.
+6. Open the [sealing test](https://rishinavroop22.github.io/sealed/sealing-test.html): it runs the same sealing code on invented reports and shows every word it missed.
+7. Click **Link a phone** and scan the code with the Android app or any phone's camera: the same sealed timeline appears there.
+8. Turn on **Device-only mode**, or switch Wi-Fi off after the first load: sealing, explanation and questions still work on Gemini Nano.
 
 ## The problem
 
@@ -52,7 +54,8 @@ Every answer is labelled with where it ran (from `response.inferenceSource`), an
 
 Many privacy tools hide names before text goes to the cloud. Sealed does that, and then does the health work only a dedicated app can:
 
-- **Health timeline per family member.** Values such as HbA1c, creatinine, uric acid or ALT are matched across different labs' naming ("SGPT", "Alanine Transaminase") and tracked over years, with each report's own reference range shaded on the chart. Family members' names never leave the browser; the cloud sees an anonymous id and the month only.
+- **Health timeline per family member.** Values such as HbA1c, creatinine, uric acid or ALT are matched across different labs' naming ("SGPT", "Alanine Transaminase") and tracked over years, with each report's own reference range shaded on the chart. Family members' names never reach the cloud, which sees an anonymous id and the month only.
+- **One timeline on laptop and phone, linked by a QR code.** The code holds an unguessable id that works for 10 minutes, and the family's names. Names go from screen to camera and never through a server; only sealed reports are shared. The QR code is drawn by our own code, not a library or a service.
 - **Critical-value alert before any AI.** Dangerous values (for example potassium above 6.2 or platelets below 50,000) trigger "contact a doctor today" from a fixed on-device check the moment a report is added, even offline.
 - **Measured privacy.** After sealing, the app reports how many requests went to any cloud AI service, measured by the browser itself. It is always 0.
 - **Read aloud** in English and eight Indian languages with the computer's own voices, for parents who find reports hard to read.
@@ -61,6 +64,28 @@ Many privacy tools hide names before text goes to the cloud. Sealed does that, a
 - **A private link for the doctor.** One click creates a read-only page with the results, ranges, trends and questions, with names replaced by neutral words. It expires after 7 days, can be stopped at any time, and the link id sits after `#` so it never reaches a server log. Firestore rules allow reading one share by its unguessable id, never listing, editing or creating one for someone else.
 - **Ready in one click for anyone trying it.** A welcome card runs a sample report end to end on a built-in sample family member with two earlier reports, and checks whether the browser has on-device AI, with exact steps to turn it on if not.
 - **Honest hybrid fallback.** If the cloud model fails, Firebase AI Logic switches to Gemini Nano automatically and the app says so, with a button to try the cloud again.
+
+## How well does it hide? Measured, not claimed
+
+The [sealing test](https://rishinavroop22.github.io/sealed/sealing-test.html) runs the app's own code on 70 invented Indian medical reports in which every identifier is marked. It shows every miss, word by word.
+
+- 50 **practice** reports were used while writing the rules: 30 by us and 20 by Gemini. They are not a fair score.
+- 20 **unseen** reports were written by Gemini after the rules were frozen. We added marks it had missed and replaced names of real organisations, and did not change the rules afterwards.
+
+Pattern rules alone, on the 20 unseen reports:
+
+| What was hidden | Before this work | Now |
+|---|---|---|
+| All identifiers | 80 of 138 (58%) | **110 of 138 (80%)** |
+| Phone, email, date of birth | | 14 of 14 |
+| ID numbers | | 20 of 23 (87%) |
+| Doctors and staff | | 29 of 31 (94%) |
+| Addresses | | 16 of 19 (84%) |
+| Labs, hospitals, companies | | 15 of 23 (65%) |
+| Names of patients and relatives | | 16 of 28 (57%) |
+| Results and medicines left readable | | 52 of 53 (98%) |
+
+Free-form names are the weak spot of rules, which is why the on-device model runs as well. The page measures rules plus Gemini Nano in any Chrome that has it. It is also why nothing is sent before you have seen the sealed text.
 
 ## Features
 
@@ -80,10 +105,10 @@ Many privacy tools hide names before text goes to the cloud. Sealed does that, a
 | Product | Use |
 |---|---|
 | Firebase AI Logic | All model calls, on-device and cloud, through one SDK (`web/js/firebase.js`) |
-| App Check | reCAPTCHA Enterprise on the hosted site, debug provider on localhost |
+| App Check | reCAPTCHA Enterprise on the hosted site, Play Integrity on Android, debug provider for development. AI calls from the app ask for short-lived, limited-use tokens |
 | Remote Config | `cloud_model` and `quick_route` change without a release |
 | Authentication | Anonymous sign-in: a private account with no name or email |
-| Cloud Firestore | Saved history, sealed text only, per-user security rules (`firestore.rules`) |
+| Cloud Firestore | Saved history and the linked family timeline, sealed text only (`firestore.rules`) |
 
 ## What stays on the device
 
@@ -92,7 +117,10 @@ Many privacy tools hide names before text goes to the cloud. Sealed does that, a
 | Original report, photo or PDF | Yes | Never |
 | Names, IDs, contact details, address | Yes | Never |
 | Sealed text | Yes | Only when you ask for a cloud explanation or save |
-| Key that maps tokens back to names | Yes (browser storage) | Never |
+| Key that maps tokens back to names | Yes (browser or app storage) | Never |
+| Family members' names | Yes, and inside the QR code you show | Never |
+
+This project uses the free Gemini Developer API tier, where Google may use prompts to improve its products. That is one more reason only sealed text is sent. A real service would use a paid tier.
 
 ## Run it locally
 
@@ -115,19 +143,22 @@ web/js/firebase.js      Firebase, App Check, Remote Config and the hybrid models
 web/js/redact.js        sealing logic (pure functions)
 web/js/ingest.js        PDF and photo reading, on the device
 web/js/store.js         anonymous sign-in and sealed history
+web/js/health.js        timeline, range checks and alerts (no AI)
+web/js/qr.js            QR codes for the family link
 web/js/app.js           UI flow and privacy ledger
+web/sealing-test.html   public sealing test, with web/js/sealing-*.js
 web/sw.js               offline cache
 web/demo-chat.html      test page for the Chrome extension (not a real chatbot)
 web/share.html          read-only doctor view of a share link
 extension/              Chrome extension: seal before you paste
-firestore.rules         per-user security rules
-android/                Android version (Kotlin, Jetpack Compose)
+firestore.rules         security rules: own reports, linked family, doctor links
+android/                Android app (Kotlin, Jetpack Compose)
 ```
 
 ## Limitations
 
-- On-device inference needs desktop Chrome with Gemini Nano. Other browsers fall back to pattern matching for sealing and are told so plainly.
-- Sealing is a strong aid, not a guarantee. The review step exists because a model can miss an identifier.
+- On-device inference needs desktop Chrome with Gemini Nano, or an Android phone that has it. Other browsers and phones fall back to pattern matching for sealing and are told so plainly.
+- Sealing is a strong aid, not a guarantee: see the measured misses above. The review step exists because of them.
 - On-device explanations are English only; Indian-language explanations come from the cloud model.
 - Sealed explains reports; it does not diagnose and is not a substitute for a doctor.
 

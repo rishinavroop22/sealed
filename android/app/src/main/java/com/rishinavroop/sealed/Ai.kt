@@ -34,7 +34,8 @@ class Ai {
     }
 
     private fun model(mode: InferenceMode, json: Boolean = false): GenerativeModel =
-        Firebase.ai(backend = GenerativeBackend.googleAI()).generativeModel(
+        // One-time App Check tokens: a stolen token cannot be used for a second request.
+        Firebase.ai(backend = GenerativeBackend.googleAI(), useLimitedUseAppCheckTokens = true).generativeModel(
             modelName = cloudModel,
             generationConfig = if (json) generationConfig { responseMimeType = "application/json" } else null,
             onDeviceConfig = OnDeviceConfig(mode = mode),
@@ -140,6 +141,13 @@ class Ai {
         return Answer(r.text.orEmpty(), whereOf(r.inferenceSource))
     }
 
+    // Rephrases facts worked out by code: test names, numbers and months only.
+    suspend fun trend(prompt: String, deviceOnly: Boolean): Answer {
+        if (!deviceOnly) cloudCalls++
+        val r = retryBusy { (if (deviceOnly) sealer else model(InferenceMode.PREFER_IN_CLOUD)).generateContent(prompt) }
+        return Answer(r.text.orEmpty().trim(), whereOf(r.inferenceSource))
+    }
+
     suspend fun ask(prompt: String, deviceOnly: Boolean): Answer {
         if (!deviceOnly) cloudCalls++
         val r = retryBusy { (if (deviceOnly) sealer else quick).generateContent(prompt) }
@@ -173,6 +181,13 @@ REPORT:
 $sealed"""
 
     fun summary(facts: String) = """Rewrite these FACTS from a lab report as 2 to 4 plain, calm sentences for a patient. $SMALL_MODEL_RULE Do not add facts or count results. End by suggesting they discuss the report with their doctor.
+
+FACTS:
+$facts"""
+
+    fun trend(facts: String) = """Rewrite these FACTS about one person's lab results over time as 3 to 5 plain, calm sentences for a patient.
+Use only what the FACTS say: do not change any number, direction or "in range" / "above range" / "below range" label, and do not compare anything yourself.
+Mention first the results that are now outside their range. Do not name any disease or cause. End by suggesting they show these changes to their doctor.
 
 FACTS:
 $facts"""

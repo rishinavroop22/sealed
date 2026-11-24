@@ -29,11 +29,23 @@
       <h1>Understand your medical report.<br>Keep your name out of it.</h1>
       <p>Sealed reads your report with an AI model that runs inside this browser, removes everything that identifies you, and shows you exactly what is left. Only that sealed version is ever sent to the cloud for a full explanation, and you can choose to keep even that on your device.</p>
       <ul class="promises">
-        <li><strong>Sealed on your device.</strong> The original never leaves this browser.</li>
+        <li><strong>Sealed on your device.</strong> The original never leaves this browser. <a href="sealing-test.html">See how much it hides</a>.</li>
         <li><strong>You see what leaves.</strong> Every cloud request is shown word for word.</li>
         <li><strong>Works offline.</strong> No signal? The on-device model explains it instead.</li>
       </ul>
       <p class="ext-promo">Use ChatGPT or Gemini? The <a href="https://github.com/rishinavroop22/sealed/tree/main/extension">Sealed Chrome extension</a> seals a report on your device when you paste it into any chatbot. <a href="demo-chat.html">Try it on the test page</a>.</p>
+    </section>
+
+    <section class="card join" id="join" hidden aria-labelledby="join-title">
+      <h2 id="join-title">Link this device to a family timeline?</h2>
+      <p id="join-people"></p>
+      <p class="note warn">Only continue if you made this code yourself, or someone in your family showed it to you. Reports you save here will be visible, sealed, on the linked devices.</p>
+      <div class="row">
+        <button class="primary" id="btn-join" type="button">Link this device</button>
+        <a class="button ghost" id="btn-join-app" hidden>Open in the Sealed app</a>
+        <button class="ghost" id="btn-join-no" type="button">Cancel</button>
+      </div>
+      <p class="note" id="join-status" role="status" aria-live="polite"></p>
     </section>
 
     <section class="card welcome" id="welcome" hidden aria-labelledby="welcome-title">
@@ -223,6 +235,15 @@
         </div>
         <p class="note small">Saved to a private account with no name or email. Only the sealed text is stored; the key that restores names stays in this browser.</p>
         <ul id="history-list"><li class="empty">Loading…</li></ul>
+        <div class="link-phone">
+          <h3>Use it on your phone too</h3>
+          <p class="note small" id="link-note">Show one family timeline on your laptop and phone. Only sealed reports are shared. Names travel inside the code, never through the cloud.</p>
+          <div class="row">
+            <button class="ghost" id="btn-link" type="button">Link a phone</button>
+            <button class="ghost" id="btn-unlink" type="button" hidden>Unlink this browser</button>
+          </div>
+          <div class="qr-box" id="qr-box" hidden></div>
+        </div>
       </section>
     </div>
   </main>

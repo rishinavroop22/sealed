@@ -1,10 +1,11 @@
 // Offline support: cache the app and the libraries it loads so Sealed opens with no network.
 // Only GET requests for code and assets are cached. Model calls, Firestore and sign-in are never cached.
-const VERSION = "sealed-v9";
+const VERSION = "sealed-v10";
 const SHELL = [
   "./", "index.html", "share.html", "demo-chat.html", "css/app.css", "icon.svg", "manifest.webmanifest",
   "js/app.js", "js/firebase.js", "js/firebase-config.js", "js/redact.js", "js/ingest.js", "js/store.js",
-  "js/health.js", "js/share.js",
+  "js/health.js", "js/share.js", "js/qr.js", "sealing-test.html", "sealing-result.json",
+  "js/sealing-test.js", "js/sealing-cases.js", "js/sealing-score.js",
 ];
 const LIBS = [/^https:\/\/www\.gstatic\.com\/firebasejs\//, /^https:\/\/cdn\.jsdelivr\.net\/npm\/pdfjs-dist@/];
 

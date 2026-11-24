@@ -8,6 +8,36 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
 
+    // A shared family timeline: sealed reports only, no names. The id is 128 random bits and travels in a QR code.
+    // A device can join only while the invite is open (at most 10 minutes), and only as itself.
+    match /families/{fid} {
+      function signedIn() { return request.auth != null; }
+      function isMember() { return signedIn() && exists(/databases/$(database)/documents/families/$(fid)/members/$(request.auth.uid)); }
+      function familyDoc() { return get(/databases/$(database)/documents/families/$(fid)).data; }
+      function inviteOk() { return request.resource.data.inviteUntil is timestamp && request.resource.data.inviteUntil < request.time + duration.value(15, 'm'); }
+
+      allow get: if isMember();
+      allow list: if false;
+      allow create: if signedIn() && request.resource.data.owner == request.auth.uid && inviteOk()
+        && request.resource.data.keys().hasOnly(['owner', 'createdAt', 'inviteUntil']);
+      allow update: if isMember() && inviteOk()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['inviteUntil']);
+      allow delete: if signedIn() && resource.data.owner == request.auth.uid;
+
+      match /members/{uid} {
+        allow get, list: if isMember();
+        allow create: if signedIn() && request.auth.uid == uid && request.resource.data.keys().hasOnly(['joinedAt'])
+          && (familyDoc().owner == uid || familyDoc().inviteUntil > request.time);
+        allow update: if signedIn() && request.auth.uid == uid && isMember() && request.resource.data.keys().hasOnly(['joinedAt']);
+        allow delete: if signedIn() && (request.auth.uid == uid || familyDoc().owner == request.auth.uid);
+      }
+      match /reports/{reportId} {
+        allow read, delete: if isMember();
+        allow create, update: if isMember() && request.resource.data.keys().hasOnly(
+          ['sealed', 'explanation', 'where', 'language', 'hidden', 'profile', 'month', 'results', 'createdAt']);
+      }
+    }
+
     // Doctor share links: anyone with the unguessable link can read until it expires.
     // Only the owner can create (for at most 30 days) or delete one. Shares can't be edited or listed.
     match /shares/{shareId} {

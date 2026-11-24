@@ -2,7 +2,7 @@
 // ONLY_ON_DEVICE: this extension never sends anything to a cloud model.
 import { initializeApp } from "firebase/app";
 import { getAI, getGenerativeModel, GoogleAIBackend, InferenceMode } from "firebase/ai";
-import { findPatternEntities, mergeEntities, seal, unseal, chunk, readJson } from "../shared/redact.js";
+import { findPatternEntities, mergeEntities, seal, unseal, chunk, readJson, SEAL_PROMPT } from "../shared/redact.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBNhTUtYR2NrarGlhKCs84yC1quvaEruWk",
@@ -36,13 +36,6 @@ const ENTITY_SCHEMA = {
   required: ["entities"],
 };
 
-const PROMPT = (text) => `List the personal identifiers in this medical document: names of the patient, relatives and doctors; hospital and lab names; street addresses; ID numbers; phone numbers; emails; dates of birth.
-Copy only the identifying words exactly as written, never the field label or a whole sentence. Never list tests, results, units, ranges, age or sex.
-Return JSON: {"entities":[{"text":"...","type":"NAME|DOCTOR|FACILITY|ADDRESS|ID|CONTACT|DOB"}]}
-
-DOCUMENT:
-${text}`;
-
 let model = null;
 function sealerModel() {
   if (model) return model;
@@ -74,7 +67,7 @@ export async function sealText(raw) {
       try { await m.initializeDeviceModel?.(); } catch {}
       let found = [];
       for (const part of chunk(raw, 2400)) {
-        const result = await m.generateContent(PROMPT(part));
+        const result = await m.generateContent(SEAL_PROMPT(part));
         const json = readJson(result.response.text());
         if (json?.entities) found = found.concat(json.entities);
       }

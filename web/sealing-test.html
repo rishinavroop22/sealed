@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sealing test: how much does Sealed hide?</title>
+  <meta name="description" content="Measure how many identifiers Sealed hides, in your own browser, on invented reports.">
+  <meta name="theme-color" content="#a8281d">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="top">
+    <a class="brand" href="index.html"><span class="seal-mark" aria-hidden="true"></span><span class="brand-name">Sealed</span></a>
+    <div class="chips"><span class="chip" id="chip-device">On-device AI: checking…</span></div>
+  </header>
+  <main id="main">
+    <section class="hero">
+      <h1>How much does Sealed hide?</h1>
+      <p>This page runs Sealed's own sealing code on invented Indian medical reports where every identifier is known, and counts what is still readable. It runs in your browser and sends nothing to any cloud AI.</p>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>Result</h2><span class="where device" id="proof">Runs on this device</span></div>
+      <div class="lang-row">
+        <label for="set">Reports</label>
+        <select id="set">
+          <option value="unseen">20 unseen reports, written by Gemini after the rules were frozen</option>
+          <option value="practice">50 practice reports, used while improving the rules</option>
+        </select>
+      </div>
+      <div class="table-wrap" tabindex="0" role="region" aria-label="Sealing test result">
+        <table class="score">
+          <thead><tr><th scope="col">What was hidden</th><th scope="col">Pattern rules only</th><th scope="col">Rules + on-device AI</th></tr></thead>
+          <tbody id="score"></tbody>
+        </table>
+      </div>
+      <p class="note" id="recorded" hidden></p>
+      <div class="row">
+        <button class="primary" id="run" type="button">Run with on-device AI</button>
+        <button class="ghost" id="copy" type="button" hidden>Copy result</button>
+        <span class="note" id="status" role="status" aria-live="polite"></span>
+      </div>
+      <p class="note">An identifier counts as hidden only if none of its own words or numbers can still be read anywhere in the report. Common words such as "Road" or "Hospital" do not count. A result counts as kept only if its whole line is unchanged.</p>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>Report by report</h2><span class="where">Missed words are marked</span></div>
+      <div id="cases"></div>
+    </section>
+
+    <section class="card">
+      <h2>How to read this</h2>
+      <ul class="plain">
+        <li>The unseen score is the honest one. Gemini wrote those 20 reports after the rules were frozen. We added marks it had missed and replaced names of real organisations. We did not change the rules afterwards.</li>
+        <li>Pattern rules are good at numbers, phone numbers and labelled fields. Names in the middle of a sentence are what the on-device model is for.</li>
+        <li>No automatic sealing is perfect. That is why Sealed always shows you the sealed text and lets you hide more before anything is sent.</li>
+        <li>Every person, place, organisation and result here is invented.</li>
+      </ul>
+    </section>
+  </main>
+  <footer><p><a href="index.html">Back to Sealed</a> · <a href="https://github.com/rishinavroop22/sealed">Open source</a> under Apache 2.0.</p></footer>
+  <script type="module" src="js/sealing-test.js"></script>
+</body>
+</html>
