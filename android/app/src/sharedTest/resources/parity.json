@@ -1,0 +1,637 @@
+{
+ "model": [
+  {
+   "text": "Patient Name: Lakshmi",
+   "type": "NAME"
+  },
+  {
+   "text": "Haemoglobin",
+   "type": "NAME"
+  },
+  {
+   "text": "CITY DIAGNOSTICS",
+   "type": "FACILITY"
+  },
+  {
+   "text": "54",
+   "type": "ID"
+  },
+  {
+   "text": "not in report",
+   "type": "NAME"
+  },
+  {
+   "text": "Arvind Menon, MD",
+   "type": "DOCTOR"
+  }
+ ],
+ "questions": [
+  {
+   "q": "Is Lakshmi Rao TSH high? Call 9848012345",
+   "sealed": "Is [NAME_2] [NAME_1] TSH high? Call (hidden)"
+  },
+  {
+   "q": "Should mrs. lakshmi devi rao see menon in Hyderabad?",
+   "sealed": "Should [NAME_1] see [DOCTOR_2] in [ADDRESS_1]?"
+  },
+  {
+   "q": "What does HYD/2291/88 mean?",
+   "sealed": "What does [ID_1] mean?"
+  },
+  {
+   "q": "Is my TSH of 6.9 high?",
+   "sealed": "Is my TSH of 6.9 high?"
+  },
+  {
+   "q": "Does City Diagnostics use a fasting test?",
+   "sealed": "Does [FACILITY_1] use a fasting test?"
+  }
+ ],
+ "findings": {
+  "input": [
+   {
+    "test": "TSH",
+    "value": "2.9 uIU/mL",
+    "reference": "0.4 - 4.0",
+    "status": "normal",
+    "meaning": "model"
+   },
+   {
+    "test": "Haemoglobin",
+    "value": "9.8 g/dL",
+    "reference": "12.0-15.0",
+    "status": "low",
+    "meaning": "model"
+   },
+   {
+    "test": "HbA1c",
+    "value": "6.3 %",
+    "reference": "< 7.5",
+    "status": "normal",
+    "meaning": "model"
+   },
+   {
+    "test": "Made up",
+    "value": "5",
+    "reference": "",
+    "status": "high",
+    "meaning": "model"
+   }
+  ],
+  "output": [
+   {
+    "test": "TSH",
+    "value": "6.9 uIU/mL",
+    "reference": "0.4 - 4.0",
+    "status": "high",
+    "meaning": "Your result is above the reference range of 0.4 - 4.0. Ask your doctor what this means for you.",
+    "checked": true
+   },
+   {
+    "test": "Haemoglobin",
+    "value": "9.8 g/dL",
+    "reference": "12.0-15.0",
+    "status": "low",
+    "meaning": "model"
+   },
+   {
+    "test": "HbA1c",
+    "value": "6.3 %",
+    "reference": "< 5.7",
+    "status": "high",
+    "meaning": "Your result is above the reference range of < 5.7. Ask your doctor what this means for you.",
+    "checked": true
+   },
+   {
+    "test": "Made up",
+    "value": "5",
+    "reference": "",
+    "status": "unclear",
+    "meaning": "Sealed could not compare this with one clear reference range. Ask your doctor what it means for you."
+   }
+  ],
+  "fixed": 2,
+  "corrected": 2,
+  "count": "3 of 4 results outside the range printed on the report, 1 with no clear range."
+ },
+ "reports": [
+  {
+   "text": "CITY DIAGNOSTICS & RESEARCH CENTRE\nRoad No. 12, Banjara Hills, Hyderabad 500034   Ph: 040-2335 0000\n\nPatient Name: Mrs. Lakshmi Devi Rao        Age: 54 Years    Sex: Female\nUHID: HYD/2291/88        Lab No: CD-774120\nRef. By: Dr. Arvind Menon        Phone: +91 98480 12345\nDOB: 14/03/1972\n\nTEST                     RESULT      UNIT        REFERENCE RANGE\nHaemoglobin              9.8         g/dL        12.0 - 15.0\nFasting Blood Glucose    118         mg/dL       70 - 100\nHbA1c                    6.3         %           < 5.7\nTSH                      6.9         uIU/mL      0.4 - 4.0\nVitamin D (25-OH)        14          ng/mL       30 - 100\n\nRemarks: Lakshmi reports tiredness for two months. Kindly correlate clinically.\nReported by Dr. S. Fatima Khan, MD (Pathology)",
+   "pattern": [
+    {
+     "text": "+91 98480 12345",
+     "type": "CONTACT",
+     "source": "pattern"
+    },
+    {
+     "text": "Mrs. Lakshmi Devi Rao",
+     "type": "NAME",
+     "source": "pattern"
+    },
+    {
+     "text": "Dr. Arvind Menon",
+     "type": "DOCTOR",
+     "source": "pattern"
+    },
+    {
+     "text": "Dr. S. Fatima Khan",
+     "type": "DOCTOR",
+     "source": "pattern"
+    },
+    {
+     "text": "HYD/2291/88",
+     "type": "ID",
+     "source": "pattern"
+    },
+    {
+     "text": "CD-774120",
+     "type": "ID",
+     "source": "pattern"
+    },
+    {
+     "text": "14/03/1972",
+     "type": "DOB",
+     "source": "pattern"
+    },
+    {
+     "text": "Road No. 12, Banjara Hills, Hyderabad 500034   Ph: 040-2335 0000",
+     "type": "ADDRESS",
+     "source": "pattern"
+    },
+    {
+     "text": "CITY DIAGNOSTICS & RESEARCH CENTRE",
+     "type": "FACILITY",
+     "source": "pattern"
+    },
+    {
+     "text": "Lakshmi",
+     "type": "NAME",
+     "source": "pattern"
+    }
+   ],
+   "merged": [
+    {
+     "text": "+91 98480 12345",
+     "type": "CONTACT",
+     "source": "pattern"
+    },
+    {
+     "text": "Mrs. Lakshmi Devi Rao",
+     "type": "NAME",
+     "source": "pattern"
+    },
+    {
+     "text": "Dr. Arvind Menon",
+     "type": "DOCTOR",
+     "source": "pattern"
+    },
+    {
+     "text": "Dr. S. Fatima Khan",
+     "type": "DOCTOR",
+     "source": "pattern"
+    },
+    {
+     "text": "HYD/2291/88",
+     "type": "ID",
+     "source": "pattern"
+    },
+    {
+     "text": "CD-774120",
+     "type": "ID",
+     "source": "pattern"
+    },
+    {
+     "text": "14/03/1972",
+     "type": "DOB",
+     "source": "pattern"
+    },
+    {
+     "text": "Road No. 12, Banjara Hills, Hyderabad 500034   Ph: 040-2335 0000",
+     "type": "ADDRESS",
+     "source": "pattern"
+    },
+    {
+     "text": "CITY DIAGNOSTICS & RESEARCH CENTRE",
+     "type": "FACILITY",
+     "source": "pattern"
+    },
+    {
+     "text": "Lakshmi",
+     "type": "NAME",
+     "source": "pattern"
+    },
+    {
+     "text": "CITY DIAGNOSTICS & RESEARCH CENTRE",
+     "type": "FACILITY",
+     "source": "model"
+    }
+   ],
+   "sealed": "[FACILITY_1]\n[ADDRESS_1]\n\nPatient Name: [NAME_1]        Age: 54 Years    Sex: Female\nUHID: [ID_1]        Lab No: [ID_2]\nRef. By: [DOCTOR_2]        Phone: [CONTACT_1]\nDOB: [DOB_1]\n\nTEST                     RESULT      UNIT        REFERENCE RANGE\nHaemoglobin              9.8         g/dL        12.0 - 15.0\nFasting Blood Glucose    118         mg/dL       70 - 100\nHbA1c                    6.3         %           < 5.7\nTSH                      6.9         uIU/mL      0.4 - 4.0\nVitamin D (25-OH)        14          ng/mL       30 - 100\n\nRemarks: [NAME_2] reports tiredness for two months. Kindly correlate clinically.\nReported by [DOCTOR_1], MD (Pathology)",
+   "map": {
+    "[ADDRESS_1]": "Road No. 12, Banjara Hills, Hyderabad 500034   Ph: 040-2335 0000",
+    "[FACILITY_1]": "CITY DIAGNOSTICS & RESEARCH CENTRE",
+    "[NAME_1]": "Mrs. Lakshmi Devi Rao",
+    "[DOCTOR_1]": "Dr. S. Fatima Khan",
+    "[DOCTOR_2]": "Dr. Arvind Menon",
+    "[CONTACT_1]": "+91 98480 12345",
+    "[ID_1]": "HYD/2291/88",
+    "[DOB_1]": "14/03/1972",
+    "[ID_2]": "CD-774120",
+    "[NAME_2]": "Lakshmi"
+   },
+   "parsed": [
+    {
+     "test": "Road No.",
+     "value": "12, Banjara",
+     "reference": "040-2335"
+    },
+    {
+     "test": "Haemoglobin",
+     "value": "9.8 g/dL",
+     "reference": "12.0 - 15.0"
+    },
+    {
+     "test": "Fasting Blood Glucose",
+     "value": "118 mg/dL",
+     "reference": "70 - 100"
+    },
+    {
+     "test": "HbA1c",
+     "value": "6.3 %",
+     "reference": "< 5.7"
+    },
+    {
+     "test": "TSH",
+     "value": "6.9 uIU/mL",
+     "reference": "0.4 - 4.0"
+    },
+    {
+     "test": "Vitamin D (25-OH)",
+     "value": "14 ng/mL",
+     "reference": "30 - 100"
+    }
+   ],
+   "keys": [
+    "road no",
+    "haemoglobin",
+    "fasting glucose",
+    "hba1c",
+    "tsh",
+    "vitamin d"
+   ],
+   "critical": []
+  },
+  {
+   "text": "SUNRISE PATHOLOGY LABS\n1061 Gandhi Main Road, Near Clock Circle\nCITY: MYSORE\nMysore - 23\nName : Ramesh Kumar Iyer   Age : 61   Gender : M\nLab No : 8268\nAadhaar: 4821 7733 9012   PAN: ABCDE1234F   Email: ramesh.iyer@example.com\nConsultant: Dr Meera Nair\n\nCreatinine PHOTOMETRY 5.4 mg/dL 0.7 - 1.3\nPotassium 6.5 mEq/L 3.5 - 5.1\nSGOT/SGPT Ratio CALCULATED 1.2 Ratio < 2.0\nPlatelet Count 0.4 lakh/cumm 1.5 - 4.1\nTotal Cholesterol 1,210 mg/dL Up to 200\nHaemoglobin 13.1 g/dL Male: 13 - 17 Female: 12 - 15\nRamesh was advised to walk daily. Gandhi statue landmark.",
+   "pattern": [
+    {
+     "text": "ramesh.iyer@example.com",
+     "type": "CONTACT",
+     "source": "pattern"
+    },
+    {
+     "text": "4821 7733 9012",
+     "type": "ID",
+     "source": "pattern"
+    },
+    {
+     "text": "ABCDE1234F",
+     "type": "ID",
+     "source": "pattern"
+    },
+    {
+     "text": "Ramesh Kumar Iyer",
+     "type": "NAME",
+     "source": "pattern"
+    },
+    {
+     "text": "Dr Meera Nair",
+     "type": "DOCTOR",
+     "source": "pattern"
+    },
+    {
+     "text": "8268",
+     "type": "ID",
+     "source": "pattern"
+    },
+    {
+     "text": "MYSORE",
+     "type": "ADDRESS",
+     "source": "pattern"
+    },
+    {
+     "text": "1061 Gandhi Main Road, Near Clock Circle",
+     "type": "ADDRESS",
+     "source": "pattern"
+    },
+    {
+     "text": "Mysore - 23",
+     "type": "ADDRESS",
+     "source": "pattern"
+    },
+    {
+     "text": "SUNRISE PATHOLOGY LABS",
+     "type": "FACILITY",
+     "source": "pattern"
+    },
+    {
+     "text": "Ramesh",
+     "type": "NAME",
+     "source": "pattern"
+    },
+    {
+     "text": "Gandhi",
+     "type": "ADDRESS",
+     "source": "pattern"
+    }
+   ],
+   "merged": [
+    {
+     "text": "ramesh.iyer@example.com",
+     "type": "CONTACT",
+     "source": "pattern"
+    },
+    {
+     "text": "4821 7733 9012",
+     "type": "ID",
+     "source": "pattern"
+    },
+    {
+     "text": "ABCDE1234F",
+     "type": "ID",
+     "source": "pattern"
+    },
+    {
+     "text": "Ramesh Kumar Iyer",
+     "type": "NAME",
+     "source": "pattern"
+    },
+    {
+     "text": "Dr Meera Nair",
+     "type": "DOCTOR",
+     "source": "pattern"
+    },
+    {
+     "text": "8268",
+     "type": "ID",
+     "source": "pattern"
+    },
+    {
+     "text": "MYSORE",
+     "type": "ADDRESS",
+     "source": "pattern"
+    },
+    {
+     "text": "1061 Gandhi Main Road, Near Clock Circle",
+     "type": "ADDRESS",
+     "source": "pattern"
+    },
+    {
+     "text": "Mysore - 23",
+     "type": "ADDRESS",
+     "source": "pattern"
+    },
+    {
+     "text": "SUNRISE PATHOLOGY LABS",
+     "type": "FACILITY",
+     "source": "pattern"
+    },
+    {
+     "text": "Ramesh",
+     "type": "NAME",
+     "source": "pattern"
+    },
+    {
+     "text": "Gandhi",
+     "type": "ADDRESS",
+     "source": "pattern"
+    }
+   ],
+   "sealed": "[FACILITY_1]\n[ADDRESS_1]\nCITY: [ADDRESS_3]\n[ADDRESS_2]\nName : [NAME_1]   Age : 61   Gender : M\nLab No : [ID_3]\nAadhaar: [ID_1]   PAN: [ID_2]   Email: [CONTACT_1]\nConsultant: [DOCTOR_1]\n\nCreatinine PHOTOMETRY 5.4 mg/dL 0.7 - 1.3\nPotassium 6.5 mEq/L 3.5 - 5.1\nSGOT/SGPT Ratio CALCULATED 1.2 Ratio < 2.0\nPlatelet Count 0.4 lakh/cumm 1.5 - 4.1\nTotal Cholesterol 1,210 mg/dL Up to 200\nHaemoglobin 13.1 g/dL Male: 13 - 17 Female: 12 - 15\n[NAME_2] was advised to walk daily. [ADDRESS_4] statue landmark.",
+   "map": {
+    "[ADDRESS_1]": "1061 Gandhi Main Road, Near Clock Circle",
+    "[CONTACT_1]": "ramesh.iyer@example.com",
+    "[FACILITY_1]": "SUNRISE PATHOLOGY LABS",
+    "[NAME_1]": "Ramesh Kumar Iyer",
+    "[ID_1]": "4821 7733 9012",
+    "[DOCTOR_1]": "Dr Meera Nair",
+    "[ADDRESS_2]": "Mysore - 23",
+    "[ID_2]": "ABCDE1234F",
+    "[ADDRESS_3]": "MYSORE",
+    "[NAME_2]": "Ramesh",
+    "[ADDRESS_4]": "Gandhi",
+    "[ID_3]": "8268"
+   },
+   "parsed": [
+    {
+     "test": "Mysore",
+     "value": "23",
+     "reference": ""
+    },
+    {
+     "test": "Creatinine",
+     "value": "5.4 mg/dL",
+     "reference": "0.7 - 1.3"
+    },
+    {
+     "test": "Potassium",
+     "value": "6.5 mEq/L",
+     "reference": "3.5 - 5.1"
+    },
+    {
+     "test": "SGOT/SGPT Ratio",
+     "value": "1.2 Ratio",
+     "reference": "< 2.0"
+    },
+    {
+     "test": "Platelet Count",
+     "value": "0.4 lakh/cumm",
+     "reference": "1.5 - 4.1"
+    },
+    {
+     "test": "Total Cholesterol",
+     "value": "1,210 mg/dL",
+     "reference": "Up to 200"
+    },
+    {
+     "test": "Haemoglobin",
+     "value": "13.1 g/dL",
+     "reference": "Male: 13 - 17 Female: 12 - 15"
+    }
+   ],
+   "keys": [
+    "mysore",
+    "creatinine",
+    "potassium",
+    "ratio sgot sgpt",
+    "platelets",
+    "total cholesterol",
+    "haemoglobin"
+   ],
+   "critical": [
+    {
+     "test": "Creatinine",
+     "value": "5.4 mg/dL",
+     "why": "very high"
+    },
+    {
+     "test": "Potassium",
+     "value": "6.5 mEq/L",
+     "why": "very high"
+    },
+    {
+     "test": "Platelet Count",
+     "value": "0.4 lakh/cumm",
+     "why": "very low"
+    }
+   ]
+  },
+  {
+   "text": "Name- Sunita S Patil\nMob 9876543210\nAddress: Flat 4B, Rose Residency, Andheri West, Mumbai 400058\r\nUrea 30 mg/dL 15 - 40\r\nHDL Cholesterol 38 mg/dL > 40\r\nSunita visited Andheri clinic.",
+   "pattern": [
+    {
+     "text": "9876543210",
+     "type": "CONTACT",
+     "source": "pattern"
+    },
+    {
+     "text": "Sunita S Patil",
+     "type": "NAME",
+     "source": "pattern"
+    },
+    {
+     "text": "Flat 4B, Rose Residency, Andheri West, Mumbai 400058",
+     "type": "ADDRESS",
+     "source": "pattern"
+    },
+    {
+     "text": "Sunita visited Andheri clinic.",
+     "type": "FACILITY",
+     "source": "pattern"
+    }
+   ],
+   "merged": [
+    {
+     "text": "9876543210",
+     "type": "CONTACT",
+     "source": "pattern"
+    },
+    {
+     "text": "Sunita S Patil",
+     "type": "NAME",
+     "source": "pattern"
+    },
+    {
+     "text": "Flat 4B, Rose Residency, Andheri West, Mumbai 400058",
+     "type": "ADDRESS",
+     "source": "pattern"
+    },
+    {
+     "text": "Sunita visited Andheri clinic.",
+     "type": "FACILITY",
+     "source": "pattern"
+    }
+   ],
+   "sealed": "Name- [NAME_1]\nMob [CONTACT_1]\nAddress: [ADDRESS_1]\r\nUrea 30 mg/dL 15 - 40\r\nHDL Cholesterol 38 mg/dL > 40\r\n[FACILITY_1]",
+   "map": {
+    "[ADDRESS_1]": "Flat 4B, Rose Residency, Andheri West, Mumbai 400058",
+    "[FACILITY_1]": "Sunita visited Andheri clinic.",
+    "[NAME_1]": "Sunita S Patil",
+    "[CONTACT_1]": "9876543210"
+   },
+   "parsed": [
+    {
+     "test": "Mob",
+     "value": "9876543210",
+     "reference": ""
+    },
+    {
+     "test": "Urea",
+     "value": "30 mg/dL",
+     "reference": "15 - 40"
+    },
+    {
+     "test": "HDL Cholesterol",
+     "value": "38 mg/dL",
+     "reference": "> 40"
+    }
+   ],
+   "keys": [
+    "mob",
+    "urea",
+    "hdl cholesterol"
+   ],
+   "critical": []
+  },
+  {
+   "text": "No identifiers here.\nSodium 139 mmol/L 135 - 145",
+   "pattern": [],
+   "merged": [],
+   "sealed": "No identifiers here.\nSodium 139 mmol/L 135 - 145",
+   "map": {},
+   "parsed": [
+    {
+     "test": "Sodium",
+     "value": "139 mmol/L",
+     "reference": "135 - 145"
+    }
+   ],
+   "keys": [
+    "sodium"
+   ],
+   "critical": []
+  }
+ ],
+ "ranges": [
+  {
+   "value": "9.8 g/dL",
+   "reference": "12.0 - 15.0",
+   "status": "low"
+  },
+  {
+   "value": "6.3 %",
+   "reference": "< 5.7",
+   "status": "high"
+  },
+  {
+   "value": "38",
+   "reference": "> 40",
+   "status": "low"
+  },
+  {
+   "value": "1,210",
+   "reference": "Up to 200",
+   "status": "high"
+  },
+  {
+   "value": "13",
+   "reference": "Male: 13 - 17 Female: 12 - 15",
+   "status": null
+  },
+  {
+   "value": "5",
+   "reference": "5 to 9",
+   "status": "normal"
+  },
+  {
+   "value": "4",
+   "reference": "≤ 4",
+   "status": "normal"
+  },
+  {
+   "value": "x",
+   "reference": "1-2",
+   "status": null
+  },
+  {
+   "value": "4",
+   "reference": "",
+   "status": null
+  },
+  {
+   "value": "12",
+   "reference": "0.4 – 4.0",
+   "status": "high"
+  }
+ ]
+}

@@ -1,4 +1,4 @@
-import { rangeStatus } from "./redact.js";
+import { rangeStatus, severalRanges, plainMeaning } from "./redact.js";
 
 // Health features that run as plain code on the device: no model, no network.
 // - test name normalisation and value parsing for the timeline
@@ -144,7 +144,7 @@ export function buildSeries(items) {
       const unit = String(f.value).replace(/^[\s\d.,-]+/, "").trim();
       if (unit && !s.unit) s.unit = unit;
       const existing = s.points.find((p) => p.month === item.month);
-      const status = rangeStatus(f.value, f.reference) || String(f.status || "").toLowerCase();
+      const status = rangeStatus(f.value, f.reference) || ""; // labels come from code, never from a model
       if (existing) Object.assign(existing, { value: v, reference: f.reference || "", status });
       else s.points.push({ month: item.month, value: v, reference: f.reference || "", status });
       if (f.reference) s.reference = f.reference;
@@ -188,6 +188,7 @@ export function notableFirst(series) {
 
 function refBand(reference) {
   const r = String(reference || "").replace(/,/g, "");
+  if (severalRanges(r)) return null; // no band when men and women have different ranges
   let m = r.match(/(-?\d+(?:\.\d+)?)\s*(?:-|–|to)\s*(-?\d+(?:\.\d+)?)/i);
   if (m) return [parseFloat(m[1]), parseFloat(m[2])];
   m = r.match(/^\s*(?:<|<=|≤|up\s*to|upto|less\s+than|below)\s*(-?\d+(?:\.\d+)?)/i);
@@ -278,9 +279,38 @@ export function quickParse(raw) {
     if (!key || key.length > 40 || /^\d/.test(key)) continue;
     const rest = (m[4] || "").trim();
     const ref = rest.match(/((?:<|>|<=|>=|≤|≥|up\s*to|upto|less\s+than|below|more\s+than|above)\s*\d[\d.,]*|\d[\d.,]*\s*(?:-|–|to)\s*\d[\d.,]*)/i);
-    out.push({ test: m[1].trim().replace(/[\s-]+$/, ""), value: `${m[2]} ${m[3] || ""}`.trim(), reference: ref ? ref[1].trim() : "" });
+    // A line with separate ranges for men and women keeps them all, so no single one is ever picked.
+    const reference = severalRanges(rest) ? rest : ref ? ref[1].trim() : "";
+    out.push({ test: m[1].trim().replace(/[\s-]+$/, ""), value: `${m[2]} ${m[3] || ""}`.trim(), reference });
   }
   return out;
+}
+
+// Numbers the model copied are compared with the report itself. A wrong value or range is replaced.
+// Tests that appear more than once are left alone unless one printed value matches.
+const rangeNumbers = (ref) => (String(ref || "").replace(/,/g, "").match(/\d+(?:\.\d+)?/g) || []).map(Number).join("|");
+export function reconcile(findings, parsed) {
+  const byKey = new Map();
+  for (const p of parsed || []) {
+    const k = normaliseTest(p.test);
+    byKey.set(k, [...(byKey.get(k) || []), p]);
+  }
+  let fixed = 0;
+  for (const f of findings || []) {
+    const printed = byKey.get(normaliseTest(f.test));
+    if (!printed) continue;
+    const same = printed.find((p) => numberIn(p.value) === numberIn(f.value));
+    const source = same || (printed.length === 1 ? printed[0] : null);
+    if (!source || (same && (!source.reference || rangeNumbers(source.reference) === rangeNumbers(f.reference)))) continue;
+    fixed++;
+    f.reference = source.reference || f.reference || "";
+    if (!same) {
+      f.value = source.value;
+      f.meaning = plainMeaning(rangeStatus(f.value, f.reference), f.reference);
+      f.checked = true;
+    }
+  }
+  return fixed;
 }
 
 // Results for the timeline: every test parsed from the report, with AI findings filling any gaps.

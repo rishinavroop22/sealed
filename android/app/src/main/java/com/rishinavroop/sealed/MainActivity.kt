@@ -1,26 +1,34 @@
 package com.rishinavroop.sealed
 
 import android.content.Intent
-import android.graphics.Bitmap
-import android.graphics.ImageDecoder
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
-import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -28,239 +36,317 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.launch
 
+// Same colours as web/css/app.css.
 private val Wax = Color(0xFFA8281D)
 private val Paper = Color(0xFFF6F1E7)
+private val CardColor = Color(0xFFFFFDF8)
+private val Ink = Color(0xFF1D1B16)
+private val Muted = Color(0xFF6B6558)
+private val Line = Color(0xFFE2D9C6)
+private val ChipBg = Color(0xFFEFE9DB)
 private val DeviceGreen = Color(0xFF1F6F54)
+private val DeviceBg = Color(0xFFE3F1EA)
 private val CloudBlue = Color(0xFF2B4F9C)
+private val CloudBg = Color(0xFFE4EAF7)
+private val Warn = Color(0xFF8A5A00)
+private val WarnBg = Color(0xFFFBF0D4)
+private val AlertBg = Color(0xFFFBE4E1)
+
+private val LANGUAGES = listOf("English", "Hindi", "Telugu", "Tamil", "Kannada", "Malayalam", "Marathi", "Bengali", "Gujarati")
 
 class MainActivity : ComponentActivity() {
-    private var shared by mutableStateOf<Intent?>(null)
+    private val vm: SealedViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        shared = intent
-        setContent { MaterialTheme(colorScheme = lightColorScheme(primary = Wax, background = Paper)) { SealedScreen(shared) } }
+        enableEdgeToEdge()
+        if (savedInstanceState == null) receive(intent)
+        setContent {
+            MaterialTheme(
+                colorScheme = lightColorScheme(
+                    primary = Wax, background = Paper, surface = CardColor, onSurface = Ink, onBackground = Ink,
+                    surfaceContainerHighest = CardColor, outline = Muted, secondaryContainer = DeviceBg, onSecondaryContainer = Ink,
+                ),
+            ) { SealedScreen(vm) }
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        shared = intent
+        receive(intent)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        vm.recheckDevice()
+    }
+
+    // A report shared from another app (photo, PDF or text), or text selected anywhere.
+    private fun receive(intent: Intent?) {
+        when (intent?.action) {
+            Intent.ACTION_PROCESS_TEXT -> intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.let { vm.setText(it.toString()) }
+            Intent.ACTION_SEND -> {
+                val uri = if (Build.VERSION.SDK_INT >= 33) intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+                else @Suppress("DEPRECATION") intent.getParcelableExtra(Intent.EXTRA_STREAM)
+                if (uri != null) vm.open(uri) else intent.getStringExtra(Intent.EXTRA_TEXT)?.let { vm.setText(it) }
+            }
+        }
     }
 }
 
-data class LedgerEntry(val where: String, val text: String)
+@Composable
+fun SealedScreen(vm: SealedViewModel) {
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let { vm.open(it) } }
+
+    Box(Modifier.fillMaxSize().background(Paper).safeDrawingPadding()) {
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Header(vm)
+            AddStep(vm) { picker.launch(arrayOf("image/*", "application/pdf", "text/plain")) }
+            vm.sealed?.let { ReviewStep(vm, it) }
+            vm.shown?.let { ex -> vm.sealed?.let { ExplainStep(vm, ex, it) } }
+            Ledger(vm)
+            Spacer(Modifier.height(72.dp))
+        }
+        Column(Modifier.align(Alignment.BottomCenter).padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            vm.error?.let { Note(it, Wax, AlertBg) }
+            vm.busy?.let { Busy(it) }
+        }
+    }
+}
 
 @Composable
-fun SealedScreen(shared: Intent?) {
-    val ctx = androidx.compose.ui.platform.LocalContext.current
-    val scope = rememberCoroutineScope()
-    val ai = remember { Ai() }
-
-    var deviceStatus by remember { mutableStateOf("checking") }
-    var deviceOnly by remember { mutableStateOf(false) }
-    var language by remember { mutableStateOf("English") }
-    var report by remember { mutableStateOf("") }
-    var busy by remember { mutableStateOf<String?>(null) }
-    var entities by remember { mutableStateOf(listOf<Entity>()) }
-    var sealed by remember { mutableStateOf<Sealed?>(null) }
-    var usedModel by remember { mutableStateOf(false) }
-    var explanation by remember { mutableStateOf<Ai.Answer?>(null) }
-    var question by remember { mutableStateOf("") }
-    val answers = remember { mutableStateListOf<Pair<String, Ai.Answer>>() }
-    val ledger = remember { mutableStateListOf<LedgerEntry>() }
-    fun log(where: String, text: String) = ledger.add(0, LedgerEntry(where, text))
-
-    fun readImage(uri: Uri) = scope.launch {
-        busy = "Reading the photo with the on-device model…"
-        runCatching {
-            val bmp: Bitmap = ImageDecoder.decodeBitmap(ImageDecoder.createSource(ctx.contentResolver, uri)) { d, _, _ ->
-                d.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-            }
-            report = ai.transcribe(bmp)
-            log("device", "Photo read by the on-device model. Nothing was uploaded.")
-        }.onFailure { log("local", "Could not read the photo: ${it.message}") }
-        busy = null
-    }
-
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> uri?.let { readImage(it) } }
-
-    LaunchedEffect(Unit) {
-        ai.loadConfig()
-        deviceStatus = ai.deviceStatus()
-        if (deviceStatus == "downloadable") ai.download { busy = it }.also { busy = null; deviceStatus = ai.deviceStatus() }
-    }
-    LaunchedEffect(shared) {
-        val i = shared ?: return@LaunchedEffect
-        if (i.action == Intent.ACTION_SEND) {
-            i.getStringExtra(Intent.EXTRA_TEXT)?.let { report = it }
-            @Suppress("DEPRECATION")
-            (i.getParcelableExtra<Uri>(Intent.EXTRA_STREAM))?.let { readImage(it) }
+private fun Header(vm: SealedViewModel) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(24.dp).background(Wax, RoundedCornerShape(50)))
+        Spacer(Modifier.width(8.dp))
+        Text("Sealed", fontSize = 22.sp, fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Serif)
+        Spacer(Modifier.weight(1f))
+        when (vm.device) {
+            "available" -> Chip("On-device AI ready", DeviceGreen, DeviceBg)
+            "checking" -> Chip("Checking this phone…", Muted, ChipBg)
+            "downloading" -> Chip("On-device AI downloading", Warn, WarnBg)
+            "downloadable" -> Chip("On-device AI not downloaded", Warn, WarnBg)
+            else -> Chip("No on-device AI here", Warn, WarnBg)
         }
     }
+    Text("A private health record for your family's lab reports.", fontSize = 26.sp, fontFamily = FontFamily.Serif, lineHeight = 32.sp, modifier = Modifier.semantics { heading() })
+    Text("Names, numbers and addresses are hidden on this phone before anything is explained.", color = Muted)
+    if (vm.device == "downloadable") OutlinedButton(onClick = { vm.downloadModel() }, enabled = vm.busy == null) { Text("Download the on-device AI model") }
+    if (vm.device == "unavailable") Text("This phone has no Gemini Nano model. Sealed still hides identifiers with pattern rules, and never sends the original.", fontSize = 13.sp, color = Muted)
+    vm.deviceModel?.let { Text("On-device model: $it", fontSize = 13.sp, color = Muted) }
 
-    fun doSeal() = scope.launch {
-        busy = "Finding identifiers…"
-        var found = Redactor.findPatternEntities(report)
-        log("local", "Pattern matching found ${found.size} identifiers. No AI, no network.")
-        usedModel = false
-        if (deviceStatus == "available") {
-            runCatching {
-                busy = "On-device model reading the report…"
-                val before = found.size
-                found = Redactor.merge(found, ai.findEntities(report), report)
-                usedModel = true
-                log("device", "On-device model found ${maxOf(0, found.size - before)} more identifiers. Nothing was sent.")
-            }.onFailure { log("local", "On-device model could not run; pattern matching only. Nothing was sent.") }
-        }
-        entities = found
-        sealed = Redactor.seal(report, found)
-        explanation = null; answers.clear()
-        busy = null
-    }
-
-    fun doExplain() = scope.launch {
-        val s = sealed ?: return@launch
-        busy = if (deviceOnly) "Writing the explanation on this device…" else "Sending the sealed version to the cloud…"
-        runCatching { ai.explain(s.text, if (deviceOnly) "English" else language, deviceOnly) }
-            .onSuccess {
-                explanation = it
-                log(it.where, if (it.where == "cloud") "Sealed report sent to ${ai.cloudModel} (${s.map.size} identifiers hidden)." else "Explanation written on this device. Nothing was sent.")
-            }
-            .onFailure { log("local", "Explanation failed: ${it.message}") }
-        busy = null
-    }
-
-    Column(
-        Modifier.fillMaxSize().background(Paper).verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
+    Panel {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(22.dp).background(Wax, RoundedCornerShape(50)))
-            Spacer(Modifier.width(8.dp))
-            Text("Sealed", fontSize = 22.sp, fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Serif)
-            Spacer(Modifier.weight(1f))
-            Chip(if (deviceStatus == "available") "On-device AI ready" else "On-device AI: $deviceStatus", if (deviceStatus == "available") DeviceGreen else Color.Gray)
-        }
-        Text("Understand your medical report. Keep your name out of it.", fontSize = 24.sp, fontFamily = FontFamily.Serif, lineHeight = 30.sp)
-
-        Card {
-            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Device-only mode", fontWeight = FontWeight.SemiBold)
-                        Text("Nothing at all is sent to the cloud", fontSize = 13.sp, color = Color.Gray)
-                    }
-                    Switch(checked = deviceOnly, onCheckedChange = { deviceOnly = it })
-                }
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf("English", "Hindi", "Telugu", "Tamil", "Kannada", "Malayalam", "Marathi", "Bengali").forEach { l ->
-                        FilterChip(selected = language == l, enabled = !deviceOnly, onClick = { language = l }, label = { Text(l) })
-                    }
-                }
+            Column(Modifier.weight(1f)) {
+                Text("Device-only mode", fontWeight = FontWeight.SemiBold)
+                Text("Nothing at all is sent to the cloud", fontSize = 13.sp, color = Muted)
             }
+            Switch(checked = vm.deviceOnly, onCheckedChange = { vm.deviceOnly = it }, modifier = Modifier.semantics { contentDescription = "Device-only mode" })
         }
-
-        busy?.let {
-            Row(Modifier.fillMaxWidth().background(Color(0xFF1D1B16), RoundedCornerShape(12.dp)).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                CircularProgressIndicator(Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
-                Spacer(Modifier.width(10.dp)); Text(it, color = Color.White)
-            }
-        }
-
-        Card {
-            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("1. Add your report", fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Serif, fontSize = 18.sp)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) { Text("Choose a photo") }
-                    OutlinedButton(onClick = { report = SAMPLE }) { Text("Sample") }
-                }
-                OutlinedTextField(report, { report = it }, Modifier.fillMaxWidth().heightIn(min = 160.dp),
-                    textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace, fontSize = 12.sp),
-                    placeholder = { Text("Paste or share a report here") })
-                Button(onClick = { doSeal() }, enabled = report.isNotBlank() && busy == null, modifier = Modifier.fillMaxWidth()) { Text("Seal it on this device") }
-            }
-        }
-
-        sealed?.let { s ->
-            Card {
-                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("2. Check what leaves this device", fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Serif, fontSize = 18.sp)
-                    Text(if (usedModel) "Sealed by on-device AI. The original never left this phone." else "Sealed by pattern matching only. Check carefully before sending.",
-                        fontSize = 13.sp, color = if (usedModel) DeviceGreen else Color(0xFF8A5A00))
-                    Text("${s.map.size} items hidden", fontSize = 13.sp, color = Color.Gray)
-                    Box(Modifier.fillMaxWidth().background(Color.White, RoundedCornerShape(10.dp)).horizontalScroll(rememberScrollState()).padding(10.dp)) {
-                        Text(buildAnnotatedString {
-                            var last = 0
-                            Regex("""\[[A-Z]+_\d+]""").findAll(s.text).forEach { m ->
-                                append(s.text.substring(last, m.range.first))
-                                withStyle(SpanStyle(background = Color(0xFF1D1B16), color = Paper, fontWeight = FontWeight.Bold)) { append(m.value.trim('[', ']')) }
-                                last = m.range.last + 1
-                            }
-                            append(s.text.substring(last))
-                        }, fontFamily = FontFamily.Monospace, fontSize = 11.sp, softWrap = false)
-                    }
-                    Button(onClick = { doExplain() }, enabled = busy == null, modifier = Modifier.fillMaxWidth()) {
-                        Text(if (deviceOnly) "Explain on this device" else "Send sealed version for explanation")
-                    }
-                }
-            }
-        }
-
-        explanation?.let { ex ->
-            val s = sealed!!
-            Card {
-                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("3. Your explanation", fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Serif, fontSize = 18.sp, modifier = Modifier.weight(1f))
-                        Chip(if (ex.where == "device") "On this device" else "Cloud", if (ex.where == "device") DeviceGreen else CloudBlue)
-                    }
-                    Text(Redactor.unseal(ex.text, s.map))
-                    Text("Sealed explains reports in plain language. It does not diagnose or replace your doctor.", fontSize = 12.sp, color = Color.Gray)
-                    OutlinedTextField(question, { question = it }, Modifier.fillMaxWidth(), placeholder = { Text("Ask a quick question") })
-                    OutlinedButton(enabled = question.isNotBlank() && busy == null, onClick = {
-                        val q = question; question = ""
-                        scope.launch {
-                            busy = "Answering…"
-                            val qs = Redactor.seal(q, Redactor.merge(entities.filter { q.contains(it.text, true) }, Redactor.findPatternEntities(q), q)).text
-                            runCatching { ai.ask(s.text, qs, deviceOnly) }.onSuccess {
-                                answers.add(0, q to it.copy(text = Redactor.unseal(it.text, s.map)))
-                                log(it.where, if (it.where == "device") "Quick question answered on this device." else "Quick question sent to the cloud, sealed.")
-                            }
-                            busy = null
-                        }
-                    }) { Text("Ask") }
-                    answers.forEach { (q, a) ->
-                        Text(q, fontWeight = FontWeight.SemiBold)
-                        Chip(if (a.where == "device") "On this device" else "Cloud", if (a.where == "device") DeviceGreen else CloudBlue)
-                        Text(a.text)
-                    }
-                }
-            }
-        }
-
-        Card {
-            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Privacy ledger", fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Serif, fontSize = 18.sp)
-                if (ledger.isEmpty()) Text("Nothing has run yet.", color = Color.Gray)
-                ledger.forEach { e ->
-                    Row(verticalAlignment = Alignment.Top) {
-                        Chip(when (e.where) { "device" -> "Device"; "cloud" -> "Cloud"; else -> "Local" },
-                            when (e.where) { "device" -> DeviceGreen; "cloud" -> CloudBlue; else -> Color.Gray })
-                        Spacer(Modifier.width(8.dp)); Text(e.text, fontSize = 13.sp)
-                    }
-                }
+        Text("Explain in", fontSize = 13.sp, color = Muted)
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            LANGUAGES.forEach { l ->
+                FilterChip(selected = vm.language == l, enabled = !vm.deviceOnly, onClick = { vm.language = l }, label = { Text(l) })
             }
         }
     }
 }
 
 @Composable
-fun Chip(text: String, color: Color) {
-    Text(text, color = color, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.background(color.copy(alpha = 0.12f), RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 4.dp))
+private fun AddStep(vm: SealedViewModel, choose: () -> Unit) = Panel {
+    Title("1. Add a report")
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(onClick = choose, enabled = vm.busy == null) { Text("Photo or PDF") }
+        OutlinedButton(onClick = { vm.setText(SAMPLE) }, enabled = vm.busy == null) { Text("Use a sample") }
+    }
+    vm.fileNote?.let { Note(it, DeviceGreen, DeviceBg) }
+    OutlinedTextField(
+        vm.report, { vm.setText(it) },
+        Modifier.fillMaxWidth().heightIn(min = 140.dp, max = 320.dp),
+        textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace, fontSize = 12.sp),
+        label = { Text("Report text") },
+        placeholder = { Text("Paste a report, or share one to Sealed from WhatsApp") },
+    )
+    Button(onClick = { vm.seal() }, enabled = vm.report.isNotBlank() && vm.busy == null, modifier = Modifier.fillMaxWidth()) { Text("Seal it on this phone") }
 }
+
+@Composable
+private fun ReviewStep(vm: SealedViewModel, s: Sealed) = Panel {
+    val ctx = LocalContext.current
+    var extra by remember { mutableStateOf("") }
+    var showHidden by remember { mutableStateOf(false) }
+
+    Title("2. Check what leaves this phone")
+    Alerts(vm.earlyAlerts)
+    if (vm.usedModel) Note("Sealed by on-device AI and pattern rules. The original never left this phone.", DeviceGreen, DeviceBg)
+    else Note("Sealed by pattern rules only. Read the sealed version carefully and hide anything personal that remains.", Warn, WarnBg)
+    vm.proof?.let { Text("Proof: $it", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = DeviceGreen) }
+
+    Box(
+        Modifier.fillMaxWidth().heightIn(max = 360.dp).background(Color.White, RoundedCornerShape(10.dp))
+            .verticalScroll(rememberScrollState()).horizontalScroll(rememberScrollState()).padding(10.dp),
+    ) {
+        SelectionContainer {
+            Text(
+                buildAnnotatedString {
+                    var last = 0
+                    Regex("""\[[A-Z]+_\d+\]""").findAll(s.text).forEach { m ->
+                        append(s.text.substring(last, m.range.first))
+                        withStyle(SpanStyle(background = Ink, color = Paper, fontWeight = FontWeight.Bold)) { append(m.value.trim('[', ']')) }
+                        last = m.range.last + 1
+                    }
+                    append(s.text.substring(last))
+                },
+                fontFamily = FontFamily.Monospace, fontSize = 11.sp, softWrap = false,
+            )
+        }
+    }
+
+    TextButton(onClick = { showHidden = !showHidden }) {
+        Text("${if (showHidden) "Hide" else "Show"} the list of ${s.map.size} hidden item${if (s.map.size == 1) "" else "s"}")
+    }
+    if (showHidden) s.map.forEach { (ph, original) ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(original, fontSize = 14.sp)
+                val by = when (vm.entities.firstOrNull { it.text.equals(original, true) }?.source) { "model" -> "on-device AI"; "you" -> "you"; else -> "pattern rule" }
+                Text("${ph.trim('[', ']')} · found by $by", fontSize = 12.sp, color = Muted)
+            }
+            TextButton(onClick = { vm.unhide(original) }, modifier = Modifier.semantics { contentDescription = "Stop hiding $original" }) { Text("Show") }
+        }
+    }
+    OutlinedTextField(extra, { extra = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("Hide something else") }, placeholder = { Text("Type it as it appears") })
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(onClick = { vm.hide(extra); extra = "" }, enabled = extra.isNotBlank()) { Text("Hide it") }
+        OutlinedButton(onClick = {
+            val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, s.text)
+            ctx.startActivity(Intent.createChooser(send, "Share the sealed version"))
+        }) { Text("Share sealed text") }
+    }
+    Button(onClick = { vm.explain() }, enabled = vm.busy == null, modifier = Modifier.fillMaxWidth()) {
+        Text(if (vm.deviceOnly) "Explain on this phone" else "Send sealed version for explanation")
+    }
+}
+
+@Composable
+private fun ExplainStep(vm: SealedViewModel, ex: Shown, s: Sealed) = Panel {
+    var question by remember { mutableStateOf("") }
+    fun view(t: String) = Redactor.unseal(t, s.map) // names restored on this phone, for your eyes only
+
+    Title("3. Your explanation")
+    when (ex.where) {
+        "device" -> Chip("Written on this phone", DeviceGreen, DeviceBg)
+        "cloud" -> Chip("Written in the cloud from the sealed version", CloudBlue, CloudBg)
+        else -> Chip("Read by code on this phone", Muted, ChipBg)
+    }
+    if (ex.note.isNotBlank()) Text(ex.note, fontSize = 13.sp, color = Muted)
+    Alerts(ex.critical)
+    Health.countLine(ex.data.findings).let { if (it.isNotEmpty()) Text(it, fontWeight = FontWeight.SemiBold) }
+    Text(view(ex.data.summary))
+    if (ex.data.urgent.isNotBlank()) Note(view(ex.data.urgent), Wax, AlertBg)
+    ex.data.findings.forEach { f -> Result(f, ::view) }
+    if (ex.data.questions.isNotEmpty()) {
+        Text("Questions for your doctor", fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Serif, fontSize = 17.sp, modifier = Modifier.semantics { heading() })
+        ex.data.questions.forEachIndexed { i, q -> Text("${i + 1}. ${view(q)}") }
+    }
+    Text("High and low labels are decided by code from the range printed on the report. Sealed does not diagnose or replace your doctor.", fontSize = 12.sp, color = Muted)
+
+    HorizontalDivider(color = Line)
+    OutlinedTextField(question, { question = it }, Modifier.fillMaxWidth(), label = { Text("Ask a quick question") })
+    OutlinedButton(enabled = question.isNotBlank() && vm.busy == null, onClick = { vm.ask(question); question = "" }) { Text("Ask") }
+    vm.replies.forEach { r ->
+        Text(r.question, fontWeight = FontWeight.SemiBold)
+        if (r.where == "device") Chip("On this phone", DeviceGreen, DeviceBg) else Chip("Cloud, sealed text only", CloudBlue, CloudBg)
+        Text(r.text)
+    }
+}
+
+@Composable
+private fun Result(f: Finding, view: (String) -> String) {
+    val (label, fg, bg) = when (f.status) {
+        "low" -> Triple("Low", Wax, AlertBg)
+        "high" -> Triple("High", Wax, AlertBg)
+        "normal" -> Triple("In range", DeviceGreen, DeviceBg)
+        else -> Triple("No clear range", Muted, ChipBg)
+    }
+    Column(Modifier.fillMaxWidth().background(Color.White, RoundedCornerShape(10.dp)).padding(12.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(view(f.test), fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Chip(label, fg, bg)
+        }
+        Text(view(f.value) + if (f.reference.isNotBlank()) " · range ${view(f.reference)}" else "", fontFamily = FontFamily.Monospace, fontSize = 13.sp)
+        if (f.meaning.isNotBlank()) Text(view(f.meaning), fontSize = 14.sp)
+        if (f.corrected) Text("Corrected by Sealed from the report", fontSize = 12.sp, color = Warn)
+    }
+}
+
+@Composable
+private fun Ledger(vm: SealedViewModel) = Panel {
+    Title("Privacy ledger")
+    Text("Everything Sealed did, and the exact text of every request it sent.", fontSize = 13.sp, color = Muted)
+    if (vm.ledger.isEmpty()) Text("Nothing has run yet.", color = Muted)
+    vm.ledger.forEach { e ->
+        var open by remember(e) { mutableStateOf(false) }
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                when (e.where) {
+                    "device" -> Chip("On-device AI", DeviceGreen, DeviceBg)
+                    "cloud" -> Chip("Cloud", CloudBlue, CloudBg)
+                    else -> Chip("Code", Muted, ChipBg)
+                }
+                Spacer(Modifier.width(8.dp))
+                Text(e.time, fontSize = 12.sp, color = Muted)
+            }
+            Text(e.text, fontSize = 14.sp)
+            e.sent?.let { sent ->
+                TextButton(onClick = { open = !open }, contentPadding = PaddingValues(0.dp)) { Text(if (open) "Hide what was sent" else "Show exactly what was sent") }
+                if (open) SelectionContainer { Text(sent, fontFamily = FontFamily.Monospace, fontSize = 11.sp, modifier = Modifier.background(Color.White, RoundedCornerShape(8.dp)).padding(8.dp)) }
+            }
+        }
+    }
+}
+
+// ---------- small pieces ----------
+@Composable
+private fun Alerts(items: List<Critical>) {
+    if (items.isEmpty()) return
+    Note("Contact a doctor today. " + items.joinToString("; ") { "${it.test} ${it.value} is ${it.why}" } + ". This is a fixed safety check, not a diagnosis.", Wax, AlertBg)
+}
+
+@Composable
+private fun Panel(content: @Composable ColumnScope.() -> Unit) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = CardColor, contentColor = Ink),
+        border = BorderStroke(1.dp, Line), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(),
+    ) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp), content = content) }
+}
+
+@Composable
+private fun Title(text: String) = Text(text, fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Serif, fontSize = 20.sp, modifier = Modifier.semantics { heading() })
+
+@Composable
+private fun Note(text: String, fg: Color, bg: Color) =
+    Text(text, color = fg, fontSize = 14.sp, modifier = Modifier.fillMaxWidth().background(bg, RoundedCornerShape(10.dp)).padding(10.dp).semantics { liveRegion = LiveRegionMode.Polite })
+
+@Composable
+private fun Busy(text: String) {
+    Row(
+        Modifier.fillMaxWidth().background(Ink, RoundedCornerShape(12.dp)).padding(14.dp).semantics { liveRegion = LiveRegionMode.Polite },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        CircularProgressIndicator(Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
+        Spacer(Modifier.width(10.dp))
+        Text(text, color = Color.White)
+    }
+}
+
+@Composable
+private fun Chip(text: String, fg: Color, bg: Color) =
+    Text(text, color = fg, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.background(bg, RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 4.dp))
 
 const val SAMPLE = """CITY DIAGNOSTICS & RESEARCH CENTRE
 Road No. 12, Banjara Hills, Hyderabad 500034   Ph: 040-2335 0000

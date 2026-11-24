@@ -127,6 +127,8 @@ function widenFacility(e, text) {
 // Generic address words that are safe to leave visible on their own.
 const GENERIC_PLACE = /^(road|rd|main|cross|street|st|lane|ln|new|old|near|opp|opposite|behind|city|locality|landmark|layout|stage|phase|block|sector|flat|house|h\.?no|no|floor|area|dist|district|taluk|state|india|colony|apartment|apartments|residency|hills|nagar|extension|ext|post|po|village|town|west|east|north|south|the|and|of)$/i;
 
+const GENERIC_FACILITY = /^(diagnostics?|laborator(y|ies)|labs?|hospitals?|clinic|centre|center|pathology|healthcare|medical|research|imaging|scans?|technologies|ltd|limited|pvt)$/i;
+
 // Addresses are often split over several lines. Hide each distinctive word of a hidden
 // address wherever it appears, so fragments like a street or area name cannot leak.
 function addAddressParts(entities, text) {
@@ -138,7 +140,7 @@ function addAddressParts(entities, text) {
     if (e.type !== "ADDRESS" && e.type !== "FACILITY") continue;
     for (const part of e.text.split(/[\s,.:;()\/-]+/)) {
       if (part.length < 4 || /\d/.test(part) || GENERIC_PLACE.test(part) || KEEP.test(part) || have.has(part.toLowerCase())) continue;
-      if (e.type === "FACILITY" && /^(diagnostics?|laborator(y|ies)|labs?|hospitals?|clinic|centre|center|pathology|healthcare|medical|research|imaging|scans?|technologies|ltd|limited|pvt)$/i.test(part)) continue;
+      if (e.type === "FACILITY" && GENERIC_FACILITY.test(part)) continue;
       if (new RegExp(`\\b${escapeRe(part)}\\b`, "i").test(rest)) {
         have.add(part.toLowerCase());
         extra.push({ text: part, type: e.type, source: "pattern" });
@@ -206,6 +208,40 @@ export function seal(text, entities) {
   return { sealed, map };
 }
 
+// Seals a question about the report. Known items keep the placeholder they have in the report, and any
+// part of a hidden name or address ("Rao" from "Lakshmi Devi Rao") is hidden too. Anything new becomes "(hidden)".
+export function sealQuestion(question, map) {
+  // Whole items come first, so they win over a part of another item with the same text.
+  const known = Object.entries(map || {}).map(([ph, original]) => [original, ph]);
+  for (const [ph, original] of Object.entries(map || {})) {
+    const place = /^\[(ADDRESS|FACILITY)/.test(ph);
+    if (!place && !/^\[(NAME|DOCTOR)/.test(ph)) continue;
+    for (const part of original.split(/[\s,.:;()\/-]+/)) {
+      const generic = place ? part.length < 4 || /\d/.test(part) || GENERIC_PLACE.test(part) || GENERIC_FACILITY.test(part) : part.length < 3 || TITLES.test(part);
+      if (!generic && !KEEP.test(part)) known.push([part, ph]);
+    }
+    // Two or more words in a row from a place name identify it, even if each word is common ("City Diagnostics").
+    if (place) {
+      const w = original.split(/\s+/);
+      for (let i = 0; i < w.length; i++) for (let j = i + 2; j <= w.length; j++) {
+        const run = w.slice(i, j).join(" ").replace(/^[^\w]+|[^\w]+$/g, "");
+        if (run.length >= 6 && run.includes(" ")) known.push([run, ph]);
+      }
+    }
+  }
+  // One private-use character stands in for each placeholder, so nothing can match inside another placeholder.
+  const placed = [];
+  let out = String(question ?? "").replace(/[\uE000-\uF8FF]/g, "");
+  for (const [value, ph] of known.sort((a, b) => b[0].length - a[0].length)) {
+    const before = /^\w/.test(value) ? "\\b" : "", after = /\w$/.test(value) ? "\\b" : "";
+    out = out.replace(new RegExp(before + escapeRe(value) + after, "gi"), () => { placed.push(ph); return String.fromCharCode(0xE000 + placed.length - 1); });
+  }
+  for (const e of findPatternEntities(out).sort((a, b) => b.text.length - a.text.length)) {
+    if (!/[\uE000-\uF8FF]/.test(e.text)) out = out.replace(new RegExp(escapeRe(e.text), "gi"), "(hidden)");
+  }
+  return out.replace(/[\uE000-\uF8FF]/g, (c) => placed[c.charCodeAt(0) - 0xE000] || "");
+}
+
 // Put the real values back, on this device only, for display.
 export function unseal(text, map) {
   let out = String(text ?? "");
@@ -245,12 +281,15 @@ const num = (s) => {
   return m ? parseFloat(m[0]) : null;
 };
 
+// Several ranges in one place (for example separate ranges for men and women): never pick one.
+export const severalRanges = (ref) =>
+  (String(ref ?? "").match(/\d\s*(?:-|–|—|to)\s*\d/gi) || []).length > 1 || /\b(male|female|men|women|M:|F:|adult|child)/i.test(String(ref ?? ""));
+
 export function rangeStatus(value, reference) {
   const v = num(value);
   const ref = String(reference ?? "").replace(/,/g, "");
   if (v === null || !ref) return null;
-  // Several ranges (for example separate ranges for men and women): don't guess.
-  if ((ref.match(/\d\s*(?:-|–|—|to)\s*\d/gi) || []).length > 1 || /\b(male|female|men|women|M:|F:|adult|child)/i.test(ref)) return null;
+  if (severalRanges(ref)) return null;
   let m = ref.match(/(-?\d+(?:\.\d+)?)\s*(?:-|–|—|to)\s*(-?\d+(?:\.\d+)?)/i);
   if (m) {
     const lo = parseFloat(m[1]), hi = parseFloat(m[2]);
@@ -266,20 +305,35 @@ export function rangeStatus(value, reference) {
 
 const PLAIN = { low: "below", normal: "within", high: "above" };
 
-// Correct each finding's status. If the model's label was wrong, its wording may be wrong too,
-// so replace it with a plain, correct sentence.
+export const plainMeaning = (status, reference) => PLAIN[status]
+  ? `Your result is ${PLAIN[status]} the reference range of ${reference}. Ask your doctor what this means for you.`
+  : "Sealed could not compare this with one clear reference range. Ask your doctor what it means for you.";
+
+// The code decides every label. If the model's label was wrong, its wording may be wrong too, so it is replaced.
+// When the report gives no single clear range the label is "unclear", never the model's guess.
 export function checkFindings(data) {
   if (!data || !Array.isArray(data.findings)) return { data, corrected: 0 };
   let corrected = 0;
   for (const f of data.findings) {
     const s = rangeStatus(f.value, f.reference);
-    if (!s) continue;
-    if (String(f.status || "").toLowerCase() !== s) {
+    const said = String(f.status || "").toLowerCase();
+    if (!s) {
+      if (said !== "unclear") { f.status = "unclear"; f.meaning = plainMeaning("unclear"); }
+    } else if (said !== s) {
       corrected++;
       f.status = s;
-      f.meaning = `Your result is ${PLAIN[s]} the reference range of ${f.reference}. Ask your doctor what this means for you.`;
+      f.meaning = plainMeaning(s, f.reference);
       f.checked = true;
     }
   }
   return { data, corrected };
+}
+
+// The count shown to people always comes from code, never from a model.
+export function countLine(findings) {
+  if (!findings?.length) return "";
+  const st = findings.map((f) => String(f.status || "").toLowerCase());
+  const out = st.filter((x) => x === "low" || x === "high").length;
+  const unclear = st.filter((x) => x === "unclear").length;
+  return `${out} of ${findings.length} results outside the range printed on the report` + (unclear ? `, ${unclear} with no clear range.` : ".");
 }

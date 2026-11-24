@@ -3,11 +3,11 @@
 import {
   getModels, deviceModelStatus, warmDeviceModel, appCheckReady, debugToken, sourceOf, configReady,
 } from "./firebase.js";
-import { findPatternEntities, mergeEntities, seal, unseal, chunk, readJson, checkFindings } from "./redact.js";
+import { findPatternEntities, mergeEntities, seal, sealQuestion, unseal, chunk, readJson, checkFindings, countLine } from "./redact.js";
 import { readFile } from "./ingest.js";
 import {
   criticalFindings, quickParse, detectMonth, monthLabel, buildSeries, trendSentence, sparkline,
-  speak, stopSpeaking, voiceFor, watchCloudAI, mergeResults, trendFacts, notableFirst,
+  speak, stopSpeaking, voiceFor, watchCloudAI, mergeResults, reconcile, trendFacts, notableFirst,
 } from "./health.js";
 
 const $ = (id) => document.getElementById(id);
@@ -243,16 +243,17 @@ function renderReview() {
 }
 
 // ---------- step 3: explanation ----------
-// The small on-device model can state medical facts wrongly, so on-device prompts are stricter:
-// what the test measures and where the value sits against its range, never a condition or cause.
+// No model, on the device or in the cloud, may name or suggest a condition: only what the test measures
+// and where the value sits against its range.
 const SMALL_MODEL_RULE = "Only say what each test measures and whether the result is below, within or above its reference range. Do not name or suggest any disease, condition or cause, and do not guess.";
 
-const EXPLAIN_PROMPT = (sealed, lang, small = false) => `You explain medical lab reports and prescriptions to patients in plain, calm language.${small ? "\n" + SMALL_MODEL_RULE : ""}
+const EXPLAIN_PROMPT = (sealed, lang) => `You explain medical lab reports and prescriptions to patients in plain, calm language.
+${SMALL_MODEL_RULE} This also applies to the summary and the questions.
 The REPORT below has been anonymised: tokens like [NAME_1] or [DOCTOR_1] replace personal details. Keep those tokens unchanged if you refer to them.
 Do not diagnose. Do not recommend specific medicines or doses. Encourage discussing results with a doctor.
 Write every text value in ${lang}. Keep test names, numbers and units as in the report.
 Return only JSON with this shape:
-{"summary":"2-3 sentence overview",
+{"summary":"2-3 sentences on what this report covers; never count results or say which are low or high, the app does that",
  "urgent":"one sentence if any value needs prompt medical attention, otherwise empty string",
  "findings" (include EVERY test in the report, normal ones too):[{"test":"name","value":"value with unit","reference":"reference range","status":"low|normal|high|unclear","meaning":"1-2 plain sentences"}],
  "questions":["3 to 5 questions the patient could ask their doctor"]}
@@ -270,7 +271,7 @@ async function explain() {
   const lang = useLocal ? "English" : language();
   $("explain-language").dataset.lang = lang;
   progress(true, useLocal ? "Writing the explanation on this device…" : "Sending the sealed version to the cloud model…");
-  const prompt = EXPLAIN_PROMPT(state.sealed, lang, useLocal);
+  const prompt = EXPLAIN_PROMPT(state.sealed, lang);
   try {
     const m = await getModels();
     if (useLocal) await warmDeviceModel(null, ["deepLocal"]);
@@ -278,6 +279,8 @@ async function explain() {
     const where = sourceOf(result);
     const text = result.response.text();
     state.explanation = readJson(text) || { summary: text, findings: [], questions: [] };
+    const fixed = reconcile(state.explanation.findings, quickParse(state.sealed));
+    if (fixed) log("local", `Sealed replaced ${fixed} value${fixed === 1 ? "" : "s"} or range${fixed === 1 ? "" : "s"} the model copied wrongly from the report.`);
     const { corrected } = checkFindings(state.explanation);
     if (corrected) log("local", `Range check corrected ${corrected} result label${corrected === 1 ? "" : "s"} the model got wrong.`);
     state.explainWhere = where;
@@ -314,6 +317,7 @@ function renderExplanation(data, where, map) {
   const view = (s) => esc(unseal(s, map)); // names restored locally, for your eyes only
   const statusClass = (s) => ["low", "normal", "high"].includes(String(s).toLowerCase()) ? String(s).toLowerCase() : "unclear";
   $("explain-body").innerHTML = `
+    ${countLine(data.findings) ? `<p class="count"><strong>${esc(countLine(data.findings))}</strong></p>` : ""}
     <p class="summary">${view(data.summary)}</p>
     ${data.urgent ? `<p class="urgent" role="alert">${view(data.urgent)}</p>` : ""}
     <div class="findings">${(data.findings || []).map((f) => `
@@ -321,7 +325,7 @@ function renderExplanation(data, where, map) {
         <span class="status ${statusClass(f.status)}">${esc(f.status || "")}</span>
         <div class="name">${view(f.test)}</div>
         <div class="val">${view(f.value)}${f.reference ? ` · ref ${view(f.reference)}` : ""}</div>
-        <p>${view(f.meaning)}</p>${f.checked ? `<p class="checked">Label corrected by Sealed's range check</p>` : ""}
+        <p>${view(f.meaning)}</p>${f.checked ? `<p class="checked">Corrected by Sealed from the report</p>` : ""}
       </div>`).join("")}</div>
     ${data.questions?.length ? `<h3 class="qhead">Questions for your doctor</h3><ol class="questions">${data.questions.map((q) => `<li>${view(q)}</li>`).join("")}</ol>` : ""}`;
 }
@@ -329,8 +333,7 @@ function renderExplanation(data, where, map) {
 // ---------- quick questions ----------
 async function ask(question) {
   // Seal the question too, in case it contains a name or number.
-  const hits = state.entities.filter((e) => question.toLowerCase().includes(e.text.toLowerCase()));
-  const qSealed = seal(question, mergeEntities(hits, findPatternEntities(question), question)).sealed;
+  const qSealed = sealQuestion(question, state.map);
   const box = document.createElement("div");
   box.className = "answer";
   box.innerHTML = `<div class="q">${esc(question)}</div><div class="a">Thinking…</div>`;

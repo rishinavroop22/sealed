@@ -5,6 +5,7 @@ node_modules/
 Thumbs.db
 android/app/google-services.json
 android/.gradle/
+android/.kotlin/
 android/build/
 android/app/build/
 android/local.properties
