@@ -16,7 +16,7 @@ Never show a real person's name, address or ID on screen.
 | 2:00–2:12 | Print sheet preview | "Before the next visit, one page for the doctor." |
 | 2:12–2:30 | Wi-Fi off, chips show Offline, quick question answered "On this device" | "No signal? Gemini Nano answers on the device. If the cloud fails, Firebase AI Logic falls back automatically, and Sealed says so." |
 | 2:30–2:47 | Laptop: "Link a phone" shows a QR code. Galaxy S25 scans it and the timeline appears; then a report photo shared from WhatsApp is sealed | "The Android app runs the same design with Gemini Nano. One code links the two. Names travel inside the code, never through the cloud." |
-| 2:47–2:57 | Sealing test page, then logo and URL | "And we publish how much it hides, misses included. Sealed. Understand your family's reports. Keep everyone's name out of it." |
+| 2:47–2:57 | Sealing test page, then logo and URL | "We publish how much it hides: 96 percent on reports it had never seen, and every patient name. Sealed. Understand your family's reports. Keep everyone's name out of it." |
 
 Checklist before upload:
 - Length under 3:00

@@ -33,12 +33,12 @@ Other Firebase products: App Check (reCAPTCHA Enterprise on the web, Play Integr
 - On a laptop without a strong GPU, Gemini Nano runs on the CPU, so sealing takes 10 to 20 seconds. We shortened the prompt, split long reports, and added a progress bar with a timer.
 - The small on-device model sometimes states medical facts wrongly: in testing it called a normal platelet count "low" and linked a high TSH to the wrong thyroid condition. On-device prompts now only say what a test measures and where the value sits against its range, and the code checks every value against its reference range itself, correcting the label and logging the correction in the privacy ledger.
 - Real reports are messy. On an actual lab PDF the patient's address was split across several lines, and on a phone photo the on-device reader first skipped the header with the patient's name. We added deterministic rules for labelled fields, street-style lines, PIN codes, city fields and house numbers, spread distinctive address words across the whole report, and told the reader to transcribe from the top so the header is sealed rather than silently dropped. After the fixes, a real PDF and two phone photos sealed with nothing identifying left and every test result kept.
-- Knowing whether sealing works. We built a public test: 70 invented Indian reports with every identifier marked, scored by the app's own code, with every missed word shown. Twenty were written by Gemini after we froze the rules. On those, pattern rules alone rose from 58% to 80% of identifiers hidden, with 52 of 53 results and medicines left readable. Names written in free text are the weak spot (57%), which is what the on-device model and the review screen are for.
+- Knowing whether sealing works. We built a public test: 70 invented Indian reports with every identifier marked, scored by the app's own code, with every missed word shown. Twenty were written by Gemini after we froze the rules. On those, pattern rules alone hide 80% of identifiers (up from 58%), and rules plus Gemini Nano hide 132 of 138 (96%), including all 65 names, IDs, contacts and birth dates. Rules alone catch only 57% of names; with Gemini Nano it is all 28. 51 of 53 results and medicines stay readable.
 - Deciding which steps may fall back to the cloud. Sealing never does; that is the point.
 
 ## Accomplishments
 - The cloud never sees the raw report, and the user can verify that word for word.
-- A measured, public sealing score that shows its own misses.
+- A measured, public sealing score that shows its own misses: 96% of identifiers on reports the rules had never seen, and every name.
 - Hybrid inference used as a privacy architecture, not just a fallback.
 - Explanations in Indian languages for families who read them better than English.
 
@@ -46,7 +46,7 @@ Other Firebase products: App Check (reCAPTCHA Enterprise on the web, Play Integr
 On-device and cloud models are good at different jobs. A small local model is well suited to finding names; a larger cloud model is better at explaining forty test results in Telugu. Putting the small one in front of the big one gives both privacy and quality.
 
 ## What's next
-- Better sealing of names in free text, measured on the same public test.
+- Better sealing of lab and doctor names, measured on a larger public test with more writers.
 - On-device explanations in Indian languages.
 - An iPhone app, and testing with more families and labs.
 

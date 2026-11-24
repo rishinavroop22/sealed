@@ -72,20 +72,24 @@ The [sealing test](https://rishinavroop22.github.io/sealed/sealing-test.html) ru
 - 50 **practice** reports were used while writing the rules: 30 by us and 20 by Gemini. They are not a fair score.
 - 20 **unseen** reports were written by Gemini after the rules were frozen. We added marks it had missed and replaced names of real organisations, and did not change the rules afterwards.
 
-Pattern rules alone, on the 20 unseen reports:
+Result on the 20 unseen reports:
 
-| What was hidden | Before this work | Now |
+| What was hidden | Pattern rules only | Rules + Gemini Nano |
 |---|---|---|
-| All identifiers | 80 of 138 (58%) | **110 of 138 (80%)** |
-| Phone, email, date of birth | | 14 of 14 |
-| ID numbers | | 20 of 23 (87%) |
-| Doctors and staff | | 29 of 31 (94%) |
-| Addresses | | 16 of 19 (84%) |
-| Labs, hospitals, companies | | 15 of 23 (65%) |
-| Names of patients and relatives | | 16 of 28 (57%) |
-| Results and medicines left readable | | 52 of 53 (98%) |
+| All identifiers | 110 of 138 (80%) | **132 of 138 (96%)** |
+| Names, IDs, contacts and birth dates | 50 of 65 (77%) | **65 of 65 (100%)** |
+| Names of patients and relatives | 16 of 28 (57%) | **28 of 28 (100%)** |
+| ID numbers | 20 of 23 (87%) | 23 of 23 (100%) |
+| Phone, email, date of birth | 14 of 14 (100%) | 14 of 14 (100%) |
+| Doctors and staff | 29 of 31 (94%) | 29 of 31 (94%) |
+| Labs, hospitals, companies | 15 of 23 (65%) | 20 of 23 (87%) |
+| Addresses | 16 of 19 (84%) | 18 of 19 (95%) |
+| Results and medicines left readable | 52 of 53 (98%) | 51 of 53 (96%) |
+| Other text hidden by mistake | 2 items | 5 items |
 
-Free-form names are the weak spot of rules, which is why the on-device model runs as well. The page measures rules plus Gemini Nano in any Chrome that has it. It is also why nothing is sent before you have seen the sealed text.
+The right-hand column is one recorded run (Gemini Nano in Chrome 158, 24 November 2026), with 0 cloud requests by design. Anyone with Gemini Nano can run it again on the page. Our first rules hid 58% of these identifiers; we improved them on the practice reports only.
+
+What this shows: rules handle numbers and labels, the on-device model handles names in free text, and neither is enough alone. The 6 misses are a doctor's or lab's name or part of an address, which is why nothing is sent before you have seen the sealed text. The limits: 20 reports is a small set, and they were written by a Gemini model, so real reports will differ.
 
 ## Features
 
